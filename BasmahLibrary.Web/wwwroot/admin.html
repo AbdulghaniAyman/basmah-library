@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1">
+
+    <title>
+        إدارة الكتالوج | مكتبة بصمة
+    </title>
+
+    <link rel="icon"
+          href="assets/images/branding/logo.png">
+
+    <link rel="stylesheet"
+          href="assets/css/style.css">
+
+</head>
+
+
+<body class="admin-page">
+
+
+    <header class="admin-header">
+
+        <a class="brand"
+           href="index.html">
+
+            <img src="assets/images/branding/logo.png"
+                 alt="مكتبة بصمة">
+
+            <div class="brand-copy">
+
+                <strong>
+                    مكتبة بصمة
+                </strong>
+
+                <small>
+                    لوحة الإدارة
+                </small>
+
+            </div>
+
+        </a>
+
+
+        <button id="logoutBtn"
+                class="outline-btn hidden"
+                type="button">
+
+            تسجيل الخروج
+
+        </button>
+
+    </header>
+
+
+    <main class="admin-shell">
+
+
+        <!-- =========================
+             LOGIN
+        ========================== -->
+
+        <section id="adminLogin"
+                 class="login-card">
+
+            <span class="eyebrow">
+                ADMIN ONLY
+            </span>
+
+
+            <h1>
+                دخول لوحة الإدارة
+            </h1>
+
+
+            <p>
+                هذه الصفحة للأدمن فقط.
+            </p>
+
+
+            <input id="adminEmail"
+                   type="email"
+                   placeholder="البريد الإلكتروني"
+                   autocomplete="username">
+
+
+            <input id="adminPassword"
+                   type="password"
+                   placeholder="كلمة المرور"
+                   autocomplete="current-password">
+
+
+            <button id="adminLoginBtn"
+                    class="primary-btn full"
+                    type="button">
+
+                دخول
+
+            </button>
+
+
+            <p id="adminLoginMessage"
+               class="message">
+            </p>
+
+        </section>
+
+
+        <!-- =========================
+             PANEL
+        ========================== -->
+
+        <section id="adminPanel"
+                 class="hidden">
+
+
+            <div class="admin-hero">
+
+                <div>
+
+                    <span class="eyebrow">
+                        CATALOG CONTROL
+                    </span>
+
+                    <h1>
+                        إدارة الكتالوج
+                    </h1>
+
+                    <p>
+                        أضف وعدّل الأقسام والمنتجات والأسعار والصور.
+                    </p>
+
+                </div>
+
+
+                <div class="admin-buttons">
+
+                    <button id="addCategoryBtn"
+                            class="outline-btn"
+                            type="button">
+
+                        + قسم جديد
+
+                    </button>
+
+
+                    <button id="addProductBtn"
+                            class="primary-btn"
+                            type="button">
+
+                        + منتج جديد
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- STATS -->
+
+            <div class="stats">
+
+                <div>
+
+                    <span>
+                        الأقسام
+                    </span>
+
+                    <strong id="statCategories">
+                        0
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        المنتجات
+                    </span>
+
+                    <strong id="statProducts">
+                        0
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        المنتجات الظاهرة
+                    </span>
+
+                    <strong id="statActive">
+                        0
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- CATEGORIES -->
+
+            <section class="admin-section">
+
+                <div class="admin-section-head">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            CATEGORIES
+                        </span>
+
+                        <h2>
+                            الأقسام
+                        </h2>
+
+                    </div>
+
+
+                    <input id="categorySearch"
+                           class="admin-search"
+                           type="search"
+                           placeholder="بحث في الأقسام...">
+
+                </div>
+
+
+                <div id="adminCategories"
+                     class="category-admin-grid">
+                </div>
+
+            </section>
+
+
+            <!-- PRODUCTS -->
+
+            <section class="admin-section">
+
+                <div class="admin-section-head">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            PRODUCTS
+                        </span>
+
+                        <h2>
+                            المنتجات
+                        </h2>
+
+                    </div>
+
+
+                    <div class="admin-filters">
+
+                        <input id="productSearch"
+                               class="admin-search"
+                               type="search"
+                               placeholder="بحث عن منتج...">
+
+
+                        <select id="productCategoryFilter"
+                                class="admin-search">
+
+                            <option value="">
+                                كل الأقسام
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <div id="adminProducts"
+                     class="admin-products-grid">
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================
+         CATEGORY MODAL
+    ========================== -->
+
+    <div id="categoryModal"
+         class="modal hidden">
+
+        <div class="modal-card">
+
+            <button class="close"
+                    data-close="categoryModal"
+                    type="button">
+
+                ×
+
+            </button>
+
+
+            <span class="eyebrow">
+                CATEGORY
+            </span>
+
+
+            <h3 id="categoryModalTitle">
+                إضافة قسم
+            </h3>
+
+
+            <input id="categoryId"
+                   type="hidden">
+
+
+            <label>
+
+                اسم القسم
+
+                <input id="categoryName"
+                       type="text">
+
+            </label>
+
+
+            <label>
+
+                وصف القسم
+
+                <textarea id="categoryDescription"
+                          rows="3">
+            </textarea>
+
+            </label>
+
+
+            <label>
+
+                الترتيب
+
+                <input id="categoryOrder"
+                       type="number"
+                       value="0">
+
+            </label>
+
+
+            <label class="switch">
+
+                <input id="categoryActive"
+                       type="checkbox"
+                       checked>
+
+                <span>
+                    القسم ظاهر
+                </span>
+
+            </label>
+
+
+            <button id="saveCategoryBtn"
+                    class="primary-btn full"
+                    type="button">
+
+                حفظ القسم
+
+            </button>
+
+
+            <p id="categoryMessage"
+               class="message">
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         PRODUCT MODAL
+    ========================== -->
+
+    <div id="productModal"
+         class="modal hidden">
+
+        <div class="modal-card wide">
+
+            <button class="close"
+                    data-close="productModal"
+                    type="button">
+
+                ×
+
+            </button>
+
+
+            <span class="eyebrow">
+                PRODUCT EDITOR
+            </span>
+
+
+            <h3 id="productModalTitle">
+                إضافة منتج
+            </h3>
+
+
+            <input id="productId"
+                   type="hidden">
+
+
+            <div class="form-grid">
+
+                <label>
+
+                    اسم المنتج
+
+                    <input id="productName"
+                           type="text">
+
+                </label>
+
+
+                <label>
+
+                    القسم
+
+                    <select id="productCategory">
+
+                        <option value="">
+                            اختر القسم
+                        </option>
+
+                    </select>
+
+                </label>
+
+
+                <label>
+
+                    السعر
+
+                    <input id="productPrice"
+                           type="number"
+                           min="0"
+                           step="0.01">
+
+                </label>
+
+
+                <label>
+
+                    تفاصيل السعر
+
+                    <input id="productPriceNote"
+                           type="text"
+                           placeholder="يبدأ من / حسب المقاس">
+
+                </label>
+
+            </div>
+
+
+            <label>
+
+                تفاصيل المنتج
+
+                <textarea id="productDescription"
+                          rows="3">
+            </textarea>
+
+            </label>
+
+
+            <div class="upload-box">
+
+                <strong>
+                    صورة المنتج
+                </strong>
+
+                <small>
+                    JPG / PNG / WEBP حتى 5MB
+                </small>
+
+
+                <input id="productImageFile"
+                       type="file"
+                       accept="image/jpeg,image/png,image/webp">
+
+
+                <div id="imagePreview"
+                     class="image-preview">
+                </div>
+
+            </div>
+
+
+            <label class="switch">
+
+                <input id="productActive"
+                       type="checkbox"
+                       checked>
+
+                <span>
+                    المنتج ظاهر على الموقع
+                </span>
+
+            </label>
+
+
+            <label>
+
+                ترتيب المنتج
+
+                <input id="productOrder"
+                       type="number"
+                       value="0">
+
+            </label>
+
+
+            <button id="saveProductBtn"
+                    class="primary-btn full"
+                    type="button">
+
+                حفظ المنتج
+
+            </button>
+
+
+            <p id="productMessage"
+               class="message">
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <script type="module"
+            src="assets/js/admin.js">
+    </script>
+
+</body>
+</html>
