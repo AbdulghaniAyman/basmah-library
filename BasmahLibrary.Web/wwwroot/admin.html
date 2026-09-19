@@ -24,6 +24,10 @@
 <body class="admin-page">
 
 
+    <!-- =====================================================
+         ADMIN HEADER
+    ====================================================== -->
+
     <header class="admin-header">
 
         <a class="brand"
@@ -58,12 +62,17 @@
     </header>
 
 
+
+    <!-- =====================================================
+         ADMIN MAIN
+    ====================================================== -->
+
     <main class="admin-shell">
 
 
-        <!-- =========================
+        <!-- =================================================
              LOGIN
-        ========================== -->
+        ================================================== -->
 
         <section id="adminLogin"
                  class="login-card">
@@ -111,13 +120,18 @@
         </section>
 
 
-        <!-- =========================
-             PANEL
-        ========================== -->
+
+        <!-- =================================================
+             ADMIN PANEL
+        ================================================== -->
 
         <section id="adminPanel"
                  class="hidden">
 
+
+            <!-- =================================================
+                 ADMIN HERO
+            ================================================== -->
 
             <div class="admin-hero">
 
@@ -127,18 +141,22 @@
                         CATALOG CONTROL
                     </span>
 
+
                     <h1>
                         إدارة الكتالوج
                     </h1>
 
+
                     <p>
-                        أضف وعدّل الأقسام والمنتجات والأسعار والصور.
+                        أضف وعدّل الأقسام والمنتجات والأسعار والصور
+                        والكتب وشريط الأخبار.
                     </p>
 
                 </div>
 
 
                 <div class="admin-buttons">
+
 
                     <button id="addCategoryBtn"
                             class="outline-btn"
@@ -157,14 +175,36 @@
 
                     </button>
 
+
+                    <button id="addBookCategoryBtn"
+                            class="outline-btn"
+                            type="button">
+
+                        + قسم كتب
+
+                    </button>
+
+
+                    <button id="addBookBtn"
+                            class="primary-btn"
+                            type="button">
+
+                        + كتاب جديد
+
+                    </button>
+
                 </div>
 
             </div>
 
 
-            <!-- STATS -->
+
+            <!-- =================================================
+                 MAIN STATS
+            ================================================== -->
 
             <div class="stats">
+
 
                 <div>
 
@@ -207,7 +247,68 @@
             </div>
 
 
-            <!-- CATEGORIES -->
+
+            <!-- =================================================
+                 NEWS TICKER MANAGEMENT
+            ================================================== -->
+
+            <section class="admin-section news-admin-section">
+
+                <div class="admin-section-head">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            NEWS TICKER
+                        </span>
+
+
+                        <h2>
+                            شريط الأخبار
+                        </h2>
+
+
+                        <p>
+                            الأخبار التي تظهر أعلى الموقع الرئيسي.
+                        </p>
+
+                    </div>
+
+
+                    <button type="button"
+                            id="addNewsBtn"
+                            class="primary-btn">
+
+                        + إضافة خبر
+
+                    </button>
+
+                </div>
+
+
+                <div id="newsMessage"
+                     class="admin-message">
+                </div>
+
+
+                <div id="adminNews"
+                     class="admin-news-list">
+
+                    <div class="empty-state">
+
+                        جاري تحميل الأخبار...
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 CATEGORIES
+            ================================================== -->
 
             <section class="admin-section">
 
@@ -218,6 +319,7 @@
                         <span class="eyebrow">
                             CATEGORIES
                         </span>
+
 
                         <h2>
                             الأقسام
@@ -236,12 +338,20 @@
 
                 <div id="adminCategories"
                      class="category-admin-grid">
+
+                    <div class="empty-state">
+                        جاري تحميل الأقسام...
+                    </div>
+
                 </div>
 
             </section>
 
 
-            <!-- PRODUCTS -->
+
+            <!-- =================================================
+                 PRODUCTS
+            ================================================== -->
 
             <section class="admin-section">
 
@@ -252,6 +362,7 @@
                         <span class="eyebrow">
                             PRODUCTS
                         </span>
+
 
                         <h2>
                             المنتجات
@@ -284,23 +395,379 @@
 
                 <div id="adminProducts"
                      class="admin-products-grid">
+
+                    <div class="empty-state">
+                        جاري تحميل المنتجات...
+                    </div>
+
                 </div>
 
             </section>
+
+
+
+            <!-- =================================================
+                 E-LIBRARY
+            ================================================== -->
+
+            <section class="admin-section book-library-admin">
+
+
+                <div class="admin-section-head">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            BASMAH E-LIBRARY
+                        </span>
+
+
+                        <h2>
+                            إدارة مكتبة الكتب
+                        </h2>
+
+
+                        <p>
+                            أضف الكتب وأقسامها وارفع الغلاف وملف PDF
+                            ليظهر الكتاب للزوار داخل الموقع.
+                        </p>
+
+                    </div>
+
+
+                    <div class="admin-buttons">
+
+
+                        <button id="addBookCategoryBtn"
+                                class="outline-btn"
+                                type="button">
+
+                            + قسم كتب
+
+                        </button>
+
+
+                        <button id="addBookBtn"
+                                class="primary-btn"
+                                type="button">
+
+                            + كتاب جديد
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div id="bookLibraryMessage"
+                     class="admin-message">
+                </div>
+
+
+
+                <!-- =================================================
+                     BOOK STATS
+                ================================================== -->
+
+                <div class="stats book-stats">
+
+
+                    <div>
+
+                        <span>
+                            أقسام الكتب
+                        </span>
+
+                        <strong id="statBookCategories">
+                            0
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            الكتب
+                        </span>
+
+                        <strong id="statBooks">
+                            0
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            الكتب الظاهرة
+                        </span>
+
+                        <strong id="statActiveBooks">
+                            0
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- =================================================
+                     BOOK CATEGORIES
+                ================================================== -->
+
+                <div class="admin-subsection">
+
+
+                    <div class="admin-section-head">
+
+                        <div>
+
+                            <span class="eyebrow">
+                                BOOK CATEGORIES
+                            </span>
+
+
+                            <h3>
+                                أقسام الكتب
+                            </h3>
+
+                        </div>
+
+
+                        <input id="bookCategorySearch"
+                               class="admin-search"
+                               type="search"
+                               placeholder="بحث في أقسام الكتب...">
+
+                    </div>
+
+
+                    <div id="adminBookCategories"
+                         class="category-admin-grid">
+
+                        <div class="empty-state">
+
+                            جاري تحميل أقسام الكتب...
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- =================================================
+                     BOOKS
+                ================================================== -->
+
+                <div class="admin-subsection">
+
+
+                    <div class="admin-section-head">
+
+                        <div>
+
+                            <span class="eyebrow">
+                                BOOKS
+                            </span>
+
+
+                            <h3>
+                                الكتب
+                            </h3>
+
+                        </div>
+
+
+                        <div class="admin-filters">
+
+
+                            <input id="bookSearch"
+                                   class="admin-search"
+                                   type="search"
+                                   placeholder="بحث عن كتاب...">
+
+
+                            <select id="bookCategoryFilter"
+                                    class="admin-search">
+
+                                <option value="">
+                                    كل أقسام الكتب
+                                </option>
+
+                            </select>
+
+
+                        </div>
+
+                    </div>
+
+
+                    <div id="adminBooks"
+                         class="admin-books-grid">
+
+                        <div class="empty-state">
+
+                            جاري تحميل الكتب...
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+            </section>
+
 
         </section>
 
     </main>
 
 
-    <!-- =========================
+
+    <!-- =====================================================
+         NEWS MODAL
+    ====================================================== -->
+
+    <div id="newsModal"
+         class="modal hidden">
+
+
+        <div class="modal-card">
+
+
+            <div class="modal-header">
+
+
+                <div>
+
+                    <span class="eyebrow">
+                        NEWS TICKER
+                    </span>
+
+
+                    <h2 id="newsModalTitle">
+                        إضافة خبر
+                    </h2>
+
+                </div>
+
+
+                <button type="button"
+                        data-close="newsModal"
+                        class="modal-close">
+
+                    ×
+
+                </button>
+
+            </div>
+
+
+            <input type="hidden"
+                   id="newsId">
+
+
+            <div class="form-group">
+
+                <label for="newsText">
+                    نص الخبر
+                </label>
+
+
+                <textarea id="newsText"
+                          rows="3"
+                          maxlength="250"
+                          placeholder="اكتب الخبر الذي سيظهر في الشريط..."></textarea>
+
+            </div>
+
+
+            <div class="form-row">
+
+
+                <div class="form-group">
+
+                    <label for="newsOrder">
+                        الترتيب
+                    </label>
+
+
+                    <input id="newsOrder"
+                           type="number"
+                           value="0"
+                           min="0">
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label class="checkbox-label">
+
+                        <input id="newsActive"
+                               type="checkbox"
+                               checked>
+
+                        ظاهر على الموقع
+
+                    </label>
+
+                </div>
+
+            </div>
+
+
+            <div id="newsFormMessage"
+                 class="admin-message">
+            </div>
+
+
+            <div class="modal-actions">
+
+
+                <button type="button"
+                        data-close="newsModal">
+
+                    إلغاء
+
+                </button>
+
+
+                <button type="button"
+                        id="saveNewsBtn"
+                        class="primary-btn">
+
+                    حفظ الخبر
+
+                </button>
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
          CATEGORY MODAL
-    ========================== -->
+    ====================================================== -->
 
     <div id="categoryModal"
          class="modal hidden">
 
+
         <div class="modal-card">
+
 
             <button class="close"
                     data-close="categoryModal"
@@ -340,8 +807,7 @@
                 وصف القسم
 
                 <textarea id="categoryDescription"
-                          rows="3">
-            </textarea>
+                          rows="3"></textarea>
 
             </label>
 
@@ -383,19 +849,23 @@
                class="message">
             </p>
 
+
         </div>
 
     </div>
 
 
-    <!-- =========================
+
+    <!-- =====================================================
          PRODUCT MODAL
-    ========================== -->
+    ====================================================== -->
 
     <div id="productModal"
          class="modal hidden">
 
+
         <div class="modal-card wide">
+
 
             <button class="close"
                     data-close="productModal"
@@ -420,7 +890,9 @@
                    type="hidden">
 
 
+
             <div class="form-grid">
+
 
                 <label>
 
@@ -469,7 +941,9 @@
 
                 </label>
 
+
             </div>
+
 
 
             <label>
@@ -477,17 +951,19 @@
                 تفاصيل المنتج
 
                 <textarea id="productDescription"
-                          rows="3">
-            </textarea>
+                          rows="3"></textarea>
 
             </label>
 
 
+
             <div class="upload-box">
+
 
                 <strong>
                     صورة المنتج
                 </strong>
+
 
                 <small>
                     JPG / PNG / WEBP حتى 5MB
@@ -503,7 +979,9 @@
                      class="image-preview">
                 </div>
 
+
             </div>
+
 
 
             <label class="switch">
@@ -519,6 +997,7 @@
             </label>
 
 
+
             <label>
 
                 ترتيب المنتج
@@ -528,6 +1007,7 @@
                        value="0">
 
             </label>
+
 
 
             <button id="saveProductBtn"
@@ -543,14 +1023,349 @@
                class="message">
             </p>
 
+
         </div>
 
     </div>
 
 
+
+    <!-- =====================================================
+         BOOK CATEGORY MODAL
+    ====================================================== -->
+
+    <div id="bookCategoryModal"
+         class="modal hidden">
+
+
+        <div class="modal-card">
+
+
+            <button class="close"
+                    data-close="bookCategoryModal"
+                    type="button">
+
+                ×
+
+            </button>
+
+
+            <span class="eyebrow">
+                BOOK CATEGORY
+            </span>
+
+
+            <h3 id="bookCategoryModalTitle">
+                إضافة قسم كتب
+            </h3>
+
+
+            <input id="bookCategoryId"
+                   type="hidden">
+
+
+            <label>
+
+                اسم القسم
+
+                <input id="bookCategoryName"
+                       type="text"
+                       placeholder="مثال: كتب القانون">
+
+            </label>
+
+
+            <label>
+
+                وصف القسم
+
+                <textarea id="bookCategoryDescription"
+                          rows="3"
+                          placeholder="وصف مختصر للقسم..."></textarea>
+
+            </label>
+
+
+            <label>
+
+                الترتيب
+
+                <input id="bookCategoryOrder"
+                       type="number"
+                       value="0"
+                       min="0">
+
+            </label>
+
+
+            <label class="switch">
+
+                <input id="bookCategoryActive"
+                       type="checkbox"
+                       checked>
+
+                <span>
+                    القسم ظاهر على الموقع
+                </span>
+
+            </label>
+
+
+            <button id="saveBookCategoryBtn"
+                    class="primary-btn full"
+                    type="button">
+
+                حفظ القسم
+
+            </button>
+
+
+            <p id="bookCategoryMessage"
+               class="message">
+            </p>
+
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         BOOK MODAL
+    ====================================================== -->
+
+    <div id="bookModal"
+         class="modal hidden">
+
+
+        <div class="modal-card wide">
+
+
+            <button class="close"
+                    data-close="bookModal"
+                    type="button">
+
+                ×
+
+            </button>
+
+
+            <span class="eyebrow">
+                BASMAH E-LIBRARY
+            </span>
+
+
+            <h3 id="bookModalTitle">
+                إضافة كتاب جديد
+            </h3>
+
+
+            <input id="bookId"
+                   type="hidden">
+
+
+
+            <!-- BOOK INFORMATION -->
+
+            <div class="form-grid">
+
+
+                <label>
+
+                    اسم الكتاب
+
+                    <input id="bookTitle"
+                           type="text"
+                           placeholder="اكتب اسم الكتاب">
+
+                </label>
+
+
+                <label>
+
+                    القسم
+
+                    <select id="bookCategory">
+
+                        <option value="">
+                            اختر قسم الكتب
+                        </option>
+
+                    </select>
+
+                </label>
+
+
+                <label>
+
+                    المؤلف
+
+                    <input id="bookAuthor"
+                           type="text"
+                           placeholder="اسم المؤلف">
+
+                </label>
+
+
+                <label>
+
+                    عدد الصفحات
+
+                    <input id="bookPages"
+                           type="number"
+                           min="0"
+                           step="1"
+                           placeholder="مثال: 250">
+
+                </label>
+
+
+            </div>
+
+
+
+            <!-- BOOK DESCRIPTION -->
+
+            <label>
+
+                وصف الكتاب
+
+                <textarea id="bookDescription"
+                          rows="4"
+                          placeholder="اكتب وصفًا مختصرًا للكتاب..."></textarea>
+
+            </label>
+
+
+
+            <!-- BOOK COVER -->
+
+            <div class="upload-box">
+
+
+                <strong>
+                    غلاف الكتاب
+                </strong>
+
+
+                <small>
+                    JPG / PNG / WEBP حتى 5MB
+                </small>
+
+
+                <input id="bookCoverFile"
+                       type="file"
+                       accept="image/jpeg,image/png,image/webp">
+
+
+                <div id="bookCoverPreview"
+                     class="image-preview">
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- BOOK PDF -->
+
+            <div class="upload-box">
+
+
+                <strong>
+                    ملف الكتاب PDF
+                </strong>
+
+
+                <small>
+                    اختر ملف PDF الخاص بالكتاب.
+                </small>
+
+
+                <input id="bookPdfFile"
+                       type="file"
+                       accept="application/pdf,.pdf">
+
+
+                <div id="bookPdfStatus"
+                     class="upload-status">
+
+                    لم يتم رفع ملف PDF بعد.
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- BOOK STATUS -->
+
+            <label class="switch">
+
+                <input id="bookActive"
+                       type="checkbox"
+                       checked>
+
+                <span>
+                    الكتاب ظاهر على الموقع
+                </span>
+
+            </label>
+
+
+
+            <!-- BOOK ORDER -->
+
+            <label>
+
+                ترتيب الكتاب
+
+                <input id="bookOrder"
+                       type="number"
+                       value="0"
+                       min="0">
+
+            </label>
+
+
+
+            <!-- BOOK MESSAGE -->
+
+            <p id="bookMessage"
+               class="message">
+            </p>
+
+
+
+            <!-- SAVE -->
+
+            <button id="saveBookBtn"
+                    class="primary-btn full"
+                    type="button">
+
+                حفظ الكتاب
+
+            </button>
+
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         SCRIPT
+    ====================================================== -->
+
     <script type="module"
             src="assets/js/admin.js">
     </script>
 
+
 </body>
+
 </html>

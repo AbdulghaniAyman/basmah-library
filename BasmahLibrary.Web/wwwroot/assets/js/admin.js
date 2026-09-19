@@ -8,44 +8,59 @@ import {
 } from "./config.js";
 
 
-const supabase =
-    createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
+/* =====================================================
+   SUPABASE
+===================================================== */
+
+const supabase = createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+);
+
+
+/* =====================================================
+   HELPERS
+===================================================== */
+
+const $ = (selector) =>
+    document.querySelector(selector);
+
+
+const esc = (value) =>
+    String(value ?? "").replace(
+        /[&<>"']/g,
+        (char) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+        }[char])
     );
 
 
-const $ =
-    selector =>
-        document.querySelector(selector);
+const money = (value) =>
+    Number(value || 0).toLocaleString(
+        "ar-EG",
+        {
+            maximumFractionDigits: 2
+        }
+    );
 
 
-const esc =
-    value =>
-        String(value ?? "").replace(
-            /[&<>"']/g,
-            char => ({
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
-            }[char])
-        );
+const now = () =>
+    new Date().toISOString();
 
 
-const money =
-    value =>
-        Number(value).toLocaleString(
-            "ar-EG",
-            {
-                maximumFractionDigits: 2
-            }
-        );
-
+/* =====================================================
+   GLOBAL DATA
+===================================================== */
 
 let categories = [];
 let products = [];
+
+let newsItems = [];
+let editingNewsId = null;
 
 let editingCategoryId = null;
 let editingProductId = null;
@@ -54,22 +69,32 @@ let selectedFile = null;
 
 
 /* =====================================================
+   BOOK LIBRARY DATA
+===================================================== */
+
+let bookCategories = [];
+let books = [];
+
+let editingBookCategoryId = null;
+let editingBookId = null;
+
+let selectedBookCover = null;
+let selectedBookPdf = null;
+
+
+/* =====================================================
    MESSAGE
 ===================================================== */
 
-function msg(
-    selector,
-    text,
-    error = true
-) {
+function msg(selector, text, error = true) {
 
-    const element =
-        $(selector);
+    const element = $(selector);
 
-    if (!element) return;
+    if (!element) {
+        return;
+    }
 
-    element.textContent =
-        text || "";
+    element.textContent = text || "";
 
     element.style.color =
         error
@@ -88,16 +113,13 @@ function showLogin(text = "") {
         ?.classList
         .remove("hidden");
 
-
     $("#adminPanel")
         ?.classList
         .add("hidden");
 
-
     $("#logoutBtn")
         ?.classList
         .add("hidden");
-
 
     msg(
         "#adminLoginMessage",
@@ -116,11 +138,9 @@ function showAdmin() {
         ?.classList
         .add("hidden");
 
-
     $("#adminPanel")
         ?.classList
         .remove("hidden");
-
 
     $("#logoutBtn")
         ?.classList
@@ -138,8 +158,7 @@ async function checkAdmin() {
         data: {
             session
         }
-    } =
-        await supabase.auth.getSession();
+    } = await supabase.auth.getSession();
 
 
     if (!session) {
@@ -147,22 +166,20 @@ async function checkAdmin() {
         showLogin();
 
         return;
-
     }
 
 
     const {
         data: profile,
         error
-    } =
-        await supabase
-            .from("profiles")
-            .select("role")
-            .eq(
-                "id",
-                session.user.id
-            )
-            .maybeSingle();
+    } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq(
+            "id",
+            session.user.id
+        )
+        .maybeSingle();
 
 
     if (
@@ -177,7 +194,6 @@ async function checkAdmin() {
         );
 
         return;
-
     }
 
 
@@ -188,88 +204,299 @@ async function checkAdmin() {
 
 
 /* =====================================================
-   LOAD
+   LOAD ALL
 ===================================================== */
 
 async function loadAll() {
 
     const [
         categoryResult,
-        productResult
-    ] =
-        await Promise.all([
+        productResult,
+        newsResult,
+        bookCategoryResult,
+        bookResult
+    ] = await Promise.all([
 
-            supabase
-                .from("categories")
-                .select("*")
-                .order(
-                    "sort_order",
-                    {
-                        ascending: true
-                    }
-                ),
+        /* PRODUCT CATEGORIES */
 
-            supabase
-                .from("products")
-                .select("*")
-                .order(
-                    "sort_order",
-                    {
-                        ascending: true
-                    }
-                )
-                .order(
-                    "created_at",
-                    {
-                        ascending: false
-                    }
-                )
+        supabase
+            .from("categories")
+            .select("*")
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            ),
 
-        ]);
+
+        /* PRODUCTS */
+
+        supabase
+            .from("products")
+            .select("*")
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            )
+            .order(
+                "created_at",
+                {
+                    ascending: false
+                }
+            ),
+
+
+        /* NEWS */
+
+        supabase
+            .from("news_ticker")
+            .select("*")
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            )
+            .order(
+                "created_at",
+                {
+                    ascending: false
+                }
+            ),
+
+
+        /* BOOK CATEGORIES */
+
+        supabase
+            .from("book_categories")
+            .select("*")
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            ),
+
+
+        /* BOOKS */
+
+        supabase
+            .from("books")
+            .select("*")
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            )
+            .order(
+                "created_at",
+                {
+                    ascending: false
+                }
+            )
+
+    ]);
+
+
+    if (categoryResult.error) {
+
+        console.error(
+            "Categories:",
+            categoryResult.error
+        );
+
+    }
+
+
+    if (productResult.error) {
+
+        console.error(
+            "Products:",
+            productResult.error
+        );
+
+    }
+
+
+    if (newsResult.error) {
+
+        console.error(
+            "News:",
+            newsResult.error
+        );
+
+        msg(
+            "#newsMessage",
+            "تعذر تحميل الأخبار: " +
+            newsResult.error.message
+        );
+
+    }
+
+
+    if (bookCategoryResult.error) {
+
+        console.error(
+            "Book Categories:",
+            bookCategoryResult.error
+        );
+
+        msg(
+            "#bookLibraryMessage",
+            "تعذر تحميل أقسام الكتب: " +
+            bookCategoryResult.error.message
+        );
+
+    }
+
+
+    if (bookResult.error) {
+
+        console.error(
+            "Books:",
+            bookResult.error
+        );
+
+        msg(
+            "#bookLibraryMessage",
+            "تعذر تحميل الكتب: " +
+            bookResult.error.message
+        );
+
+    }
 
 
     categories =
         categoryResult.data || [];
 
+
     products =
         productResult.data || [];
 
 
+    newsItems =
+        newsResult.data || [];
+
+
+    bookCategories =
+        bookCategoryResult.data || [];
+
+
+    books =
+        bookResult.data || [];
+
+
     renderStats();
+
     fillCategorySelects();
+
     renderCategories();
+
     renderProducts();
+
+    renderNews();
+
+    renderBookStats();
+
+    renderBookCategories();
+
+    fillBookCategorySelect();
+
+    renderBooks();
 }
 
 
 /* =====================================================
-   STATS
+   PRODUCT STATS
 ===================================================== */
 
 function renderStats() {
 
-    $("#statCategories")
-        .textContent =
-        categories.filter(
-            c => c.active
-        ).length;
+    if ($("#statCategories")) {
+
+        $("#statCategories")
+            .textContent =
+            categories.filter(
+                c => c.active
+            ).length;
+
+    }
 
 
-    $("#statProducts")
-        .textContent =
-        products.length;
+    if ($("#statProducts")) {
+
+        $("#statProducts")
+            .textContent =
+            products.length;
+
+    }
 
 
-    $("#statActive")
-        .textContent =
-        products.filter(
-            p => p.active
-        ).length;
+    if ($("#statActive")) {
+
+        $("#statActive")
+            .textContent =
+            products.filter(
+                p => p.active
+            ).length;
+
+    }
 }
 
 
 /* =====================================================
-   SELECTS
+   BOOK STATS
+===================================================== */
+
+function renderBookStats() {
+
+    const statCategories =
+        $("#statBookCategories");
+
+    const statBooks =
+        $("#statBooks");
+
+    const statActiveBooks =
+        $("#statActiveBooks");
+
+
+    if (statCategories) {
+
+        statCategories.textContent =
+            bookCategories.filter(
+                category =>
+                    category.active
+            ).length;
+
+    }
+
+
+    if (statBooks) {
+
+        statBooks.textContent =
+            books.length;
+
+    }
+
+
+    if (statActiveBooks) {
+
+        statActiveBooks.textContent =
+            books.filter(
+                book =>
+                    book.active
+            ).length;
+
+    }
+}
+
+
+/* =====================================================
+   PRODUCT CATEGORY SELECTS
 ===================================================== */
 
 function fillCategorySelects() {
@@ -278,24 +505,18 @@ function fillCategorySelects() {
         categories
             .map(
                 c => `
-
-                    <option value="${c.id}">
-
+                    <option value="${esc(c.id)}">
                         ${esc(c.name)}
-
-                        ${c.active
-                        ? ""
-                        : " — مخفي"
-                    }
-
+                        ${c.active ? "" : " — مخفي"}
                     </option>
                 `
             )
             .join("");
 
 
-    $("#productCategory").innerHTML =
-        `
+    if ($("#productCategory")) {
+
+        $("#productCategory").innerHTML = `
             <option value="">
                 اختر القسم
             </option>
@@ -303,58 +524,70 @@ function fillCategorySelects() {
             ${options}
         `;
 
+    }
+
 
     const oldValue =
         $("#productCategoryFilter")
-            .value;
+            ?.value || "";
 
 
-    $("#productCategoryFilter")
-        .innerHTML =
-        `
-            <option value="">
-                كل الأقسام
-            </option>
+    if ($("#productCategoryFilter")) {
 
-            ${options}
-        `;
+        $("#productCategoryFilter")
+            .innerHTML = `
+                <option value="">
+                    كل الأقسام
+                </option>
+
+                ${options}
+            `;
 
 
-    $("#productCategoryFilter")
-        .value =
-        oldValue;
+        $("#productCategoryFilter")
+            .value =
+            oldValue;
+
+    }
 }
 
 
 /* =====================================================
-   CATEGORIES
+   PRODUCT CATEGORIES
 ===================================================== */
 
 function renderCategories() {
 
     const search =
         $("#categorySearch")
-            .value
+            ?.value
             .trim()
-            .toLowerCase();
+            .toLowerCase() || "";
 
 
     const list =
         categories.filter(
             c =>
                 !search ||
-                c.name
+                String(c.name)
                     .toLowerCase()
                     .includes(search)
         );
 
 
-    $("#adminCategories")
-        .innerHTML =
+    const container =
+        $("#adminCategories");
+
+
+    if (!container) {
+        return;
+    }
+
+
+    container.innerHTML =
         list
             .map(
                 c => `
-
                     <article
                         class="category-admin-card"
                     >
@@ -373,23 +606,18 @@ function renderCategories() {
 
                                 <p>
                                     ${esc(
-                    c.description ||
-                    ""
+                    c.description || ""
                 )}
                                 </p>
 
                                 <small>
-
                                     الترتيب:
                                     ${c.sort_order}
-
                                     •
-
                                     ${c.active
                         ? "ظاهر"
                         : "مخفي"
                     }
-
                                 </small>
 
                             </div>
@@ -401,33 +629,28 @@ function renderCategories() {
 
                             <button
                                 type="button"
-                                data-edit-cat="${c.id}"
+                                data-edit-cat="${esc(c.id)}"
                             >
                                 تعديل
                             </button>
 
-
                             <button
                                 type="button"
-                                data-toggle-cat="${c.id}"
+                                data-toggle-cat="${esc(c.id)}"
                             >
-
                                 ${c.active
                         ? "إخفاء"
                         : "إظهار"
                     }
-
                             </button>
 
                         </div>
 
                     </article>
-
                 `
             )
             .join("")
         ||
-
         `
             <div class="empty-state">
                 لا توجد أقسام.
@@ -478,14 +701,14 @@ function renderProducts() {
 
     const search =
         $("#productSearch")
-            .value
+            ?.value
             .trim()
-            .toLowerCase();
+            .toLowerCase() || "";
 
 
     const categoryId =
         $("#productCategoryFilter")
-            .value;
+            ?.value || "";
 
 
     const list =
@@ -494,16 +717,24 @@ function renderProducts() {
 
                 const categoryMatch =
                     !categoryId ||
-                    product.category_id ===
-                    categoryId;
+                    String(product.category_id) ===
+                    String(categoryId);
+
+
+                const searchText =
+                    [
+                        product.name,
+                        product.description,
+                        product.price_note
+                    ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .toLowerCase();
 
 
                 const searchMatch =
                     !search ||
-                    `${product.name} ${product.description || ""
-                        }`
-                        .toLowerCase()
-                        .includes(search);
+                    searchText.includes(search);
 
 
                 return (
@@ -514,15 +745,20 @@ function renderProducts() {
         );
 
 
-    $("#adminProducts")
-        .innerHTML =
+    const container =
+        $("#adminProducts");
+
+
+    if (!container) {
+        return;
+    }
+
+
+    container.innerHTML =
         list
-            .map(
-                productCard
-            )
+            .map(productCard)
             .join("")
         ||
-
         `
             <div class="empty-state">
                 لا توجد منتجات مطابقة.
@@ -574,26 +810,24 @@ function productCard(product) {
     const category =
         categories.find(
             c =>
-                c.id ===
-                product.category_id
+                String(c.id) ===
+                String(product.category_id)
         );
 
 
     const image =
         product.image_url
-
             ? `
                 <img
                     src="${esc(product.image_url)}"
                     alt="${esc(product.name)}"
                 >
-              `
-
+            `
             : `
                 <div class="admin-placeholder">
                     بدون صورة
                 </div>
-              `;
+            `;
 
 
     const price =
@@ -601,36 +835,29 @@ function productCard(product) {
             product.price !== undefined &&
             Number(product.price) > 0
 
-            ? `
-                ${money(product.price)} ج.م
-              `
+            ? `${money(product.price)} ج.م`
 
             : "حسب الطلب";
 
 
     return `
-
         <article
             class="admin-product-card"
         >
 
             <div class="admin-product-image">
-
                 ${image}
-
             </div>
 
 
             <div class="admin-product-main">
 
                 <span class="eyebrow">
-
                     ${esc(
         category?.name ||
         product.category ||
         "بدون قسم"
     )}
-
                 </span>
 
 
@@ -640,6 +867,7 @@ function productCard(product) {
 
 
                 <div class="admin-price">
+
                     ${price}
 
                     ${product.price_note
@@ -649,7 +877,7 @@ function productCard(product) {
                 product.price_note
             )}
                                 </small>
-                              `
+                            `
             : ""
         }
 
@@ -662,12 +890,10 @@ function productCard(product) {
             : "off"
         }"
                 >
-
                     ${product.active
             ? "ظاهر"
             : "مخفي"
         }
-
                 </span>
 
 
@@ -675,7 +901,7 @@ function productCard(product) {
 
                     <button
                         type="button"
-                        data-edit-product="${product.id}"
+                        data-edit-product="${esc(product.id)}"
                     >
                         تعديل
                     </button>
@@ -683,14 +909,12 @@ function productCard(product) {
 
                     <button
                         type="button"
-                        data-toggle-product="${product.id}"
+                        data-toggle-product="${esc(product.id)}"
                     >
-
                         ${product.active
             ? "إخفاء"
             : "إظهار"
         }
-
                     </button>
 
                 </div>
@@ -698,24 +922,456 @@ function productCard(product) {
             </div>
 
         </article>
-
     `;
 }
 
 
 /* =====================================================
-   CATEGORY EDIT
+   NEWS
+===================================================== */
+
+function renderNews() {
+
+    const container =
+        $("#adminNews");
+
+
+    if (!container) {
+        return;
+    }
+
+
+    if (!newsItems.length) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                لا توجد أخبار حاليًا.
+                اضغط على "إضافة خبر" لإنشاء أول خبر.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML =
+        newsItems
+            .map(
+                news => `
+                    <article
+                        class="admin-news-card"
+                    >
+
+                        <div class="admin-news-main">
+
+                            <div class="admin-news-status">
+
+                                <span
+                                    class="status ${news.active
+                        ? "on"
+                        : "off"
+                    }"
+                                >
+                                    ${news.active
+                        ? "ظاهر"
+                        : "مخفي"
+                    }
+                                </span>
+
+                                <small>
+                                    الترتيب:
+                                    ${news.sort_order}
+                                </small>
+
+                            </div>
+
+
+                            <p class="admin-news-text">
+                                ${esc(news.text)}
+                            </p>
+
+                        </div>
+
+
+                        <div class="row-actions">
+
+                            <button
+                                type="button"
+                                data-edit-news="${esc(news.id)}"
+                            >
+                                تعديل
+                            </button>
+
+
+                            <button
+                                type="button"
+                                data-toggle-news="${esc(news.id)}"
+                            >
+                                ${news.active
+                        ? "إخفاء"
+                        : "إظهار"
+                    }
+                            </button>
+
+
+                            <button
+                                type="button"
+                                data-delete-news="${esc(news.id)}"
+                                class="danger-btn"
+                            >
+                                حذف
+                            </button>
+
+                        </div>
+
+                    </article>
+                `
+            )
+            .join("");
+
+
+    document
+        .querySelectorAll(
+            "[data-edit-news]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        openNews(
+                            button.dataset.editNews
+                        );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            "[data-toggle-news]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        toggleNews(
+                            button.dataset.toggleNews
+                        );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            "[data-delete-news]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        deleteNews(
+                            button.dataset.deleteNews
+                        );
+
+            }
+        );
+}
+
+
+/* =====================================================
+   OPEN NEWS
+===================================================== */
+
+function openNews(id = null) {
+
+    editingNewsId = id;
+
+
+    const news =
+        newsItems.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    $("#newsModalTitle")
+        .textContent =
+        id
+            ? "تعديل الخبر"
+            : "إضافة خبر";
+
+
+    $("#newsId")
+        .value =
+        id || "";
+
+
+    $("#newsText")
+        .value =
+        news?.text || "";
+
+
+    $("#newsOrder")
+        .value =
+        news?.sort_order ??
+        newsItems.length;
+
+
+    $("#newsActive")
+        .checked =
+        news?.active ??
+        true;
+
+
+    msg(
+        "#newsFormMessage",
+        ""
+    );
+
+
+    $("#newsModal")
+        ?.classList
+        .remove("hidden");
+}
+
+
+/* =====================================================
+   SAVE NEWS
+===================================================== */
+
+async function saveNews() {
+
+    const text =
+        $("#newsText")
+            ?.value
+            .trim() || "";
+
+
+    const sortOrder =
+        Number(
+            $("#newsOrder")
+                ?.value
+        ) || 0;
+
+
+    const active =
+        $("#newsActive")
+            ?.checked ??
+        true;
+
+
+    if (!text) {
+
+        return msg(
+            "#newsFormMessage",
+            "اكتب نص الخبر."
+        );
+
+    }
+
+
+    if (text.length > 250) {
+
+        return msg(
+            "#newsFormMessage",
+            "نص الخبر يجب ألا يتجاوز 250 حرفًا."
+        );
+
+    }
+
+
+    const payload = {
+
+        text,
+
+        active,
+
+        sort_order:
+            sortOrder,
+
+        updated_at:
+            now()
+
+    };
+
+
+    msg(
+        "#newsFormMessage",
+        "جاري الحفظ...",
+        false
+    );
+
+
+    const result =
+        editingNewsId
+
+            ? await supabase
+                .from("news_ticker")
+                .update(payload)
+                .eq(
+                    "id",
+                    editingNewsId
+                )
+
+            : await supabase
+                .from("news_ticker")
+                .insert(payload);
+
+
+    if (result.error) {
+
+        return msg(
+            "#newsFormMessage",
+            "تعذر حفظ الخبر: " +
+            result.error.message
+        );
+
+    }
+
+
+    $("#newsModal")
+        ?.classList
+        .add("hidden");
+
+
+    editingNewsId = null;
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   TOGGLE NEWS
+===================================================== */
+
+async function toggleNews(id) {
+
+    const news =
+        newsItems.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    if (!news) {
+        return;
+    }
+
+
+    const {
+        error
+    } =
+        await supabase
+            .from("news_ticker")
+            .update({
+
+                active:
+                    !news.active,
+
+                updated_at:
+                    now()
+
+            })
+            .eq(
+                "id",
+                id
+            );
+
+
+    if (error) {
+
+        alert(
+            "تعذر تغيير حالة الخبر:\n" +
+            error.message
+        );
+
+        return;
+    }
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   DELETE NEWS
+===================================================== */
+
+async function deleteNews(id) {
+
+    const news =
+        newsItems.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    if (!news) {
+        return;
+    }
+
+
+    const confirmed =
+        confirm(
+            "هل أنت متأكد من حذف هذا الخبر؟\n\n" +
+            news.text
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const {
+        error
+    } =
+        await supabase
+            .from("news_ticker")
+            .delete()
+            .eq(
+                "id",
+                id
+            );
+
+
+    if (error) {
+
+        alert(
+            "تعذر حذف الخبر:\n" +
+            error.message
+        );
+
+        return;
+    }
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   OPEN PRODUCT CATEGORY
 ===================================================== */
 
 function openCategory(id = null) {
 
-    editingCategoryId =
-        id;
+    editingCategoryId = id;
 
 
     const category =
         categories.find(
-            c => c.id === id
+            c =>
+                String(c.id) ===
+                String(id)
         );
 
 
@@ -753,14 +1409,20 @@ function openCategory(id = null) {
         true;
 
 
+    msg(
+        "#categoryMessage",
+        ""
+    );
+
+
     $("#categoryModal")
-        .classList
+        ?.classList
         .remove("hidden");
 }
 
 
 /* =====================================================
-   SAVE CATEGORY
+   SAVE PRODUCT CATEGORY
 ===================================================== */
 
 async function saveCategory() {
@@ -781,26 +1443,40 @@ async function saveCategory() {
     }
 
 
-    const baseSlug =
-        name
-            .toLowerCase()
-            .replace(
-                /[^\p{L}\p{N}]+/gu,
-                "-"
-            )
-            .replace(
-                /^-|-$/g,
-                ""
-            );
+    let slug;
 
 
-    const slug =
-        `${baseSlug}-${(
-            editingCategoryId ||
-            crypto
+    if (editingCategoryId) {
+
+        slug =
+            categories.find(
+                c =>
+                    String(c.id) ===
+                    String(editingCategoryId)
+            )?.slug ||
+            `category-${editingCategoryId}`;
+
+    } else {
+
+        const baseSlug =
+            name
+                .toLowerCase()
+                .replace(
+                    /[^\p{L}\p{N}]+/gu,
+                    "-"
+                )
+                .replace(
+                    /^-|-$/g,
+                    ""
+                );
+
+
+        slug =
+            `${baseSlug}-${crypto
                 .randomUUID()
-                .slice(0, 8)
-        )}`;
+                .slice(0, 8)}`;
+
+    }
 
 
     const payload = {
@@ -825,10 +1501,16 @@ async function saveCategory() {
                 .checked,
 
         updated_at:
-            new Date()
-                .toISOString()
+            now()
 
     };
+
+
+    msg(
+        "#categoryMessage",
+        "جاري الحفظ...",
+        false
+    );
 
 
     const result =
@@ -858,7 +1540,7 @@ async function saveCategory() {
 
 
     $("#categoryModal")
-        .classList
+        ?.classList
         .add("hidden");
 
 
@@ -867,18 +1549,22 @@ async function saveCategory() {
 
 
 /* =====================================================
-   TOGGLE CATEGORY
+   TOGGLE PRODUCT CATEGORY
 ===================================================== */
 
 async function toggleCategory(id) {
 
     const category =
         categories.find(
-            c => c.id === id
+            c =>
+                String(c.id) ===
+                String(id)
         );
 
 
-    if (!category) return;
+    if (!category) {
+        return;
+    }
 
 
     const {
@@ -887,12 +1573,13 @@ async function toggleCategory(id) {
         await supabase
             .from("categories")
             .update({
+
                 active:
                     !category.active,
 
                 updated_at:
-                    new Date()
-                        .toISOString()
+                    now()
+
             })
             .eq(
                 "id",
@@ -913,21 +1600,21 @@ async function toggleCategory(id) {
 
 
 /* =====================================================
-   PRODUCT EDIT
+   OPEN PRODUCT
 ===================================================== */
 
 function openProduct(id = null) {
 
-    editingProductId =
-        id;
+    editingProductId = id;
 
-    selectedFile =
-        null;
+    selectedFile = null;
 
 
     const product =
         products.find(
-            p => p.id === id
+            p =>
+                String(p.id) ===
+                String(id)
         );
 
 
@@ -988,16 +1675,14 @@ function openProduct(id = null) {
     if (product?.image_url) {
 
         $("#imagePreview")
-            .innerHTML =
-            `
+            .innerHTML = `
                 <img
                     src="${esc(product.image_url)}"
                     alt=""
                 >
             `;
 
-    }
-    else {
+    } else {
 
         $("#imagePreview")
             .innerHTML =
@@ -1006,14 +1691,20 @@ function openProduct(id = null) {
     }
 
 
+    msg(
+        "#productMessage",
+        ""
+    );
+
+
     $("#productModal")
-        .classList
+        ?.classList
         .remove("hidden");
 }
 
 
 /* =====================================================
-   IMAGE
+   PRODUCT IMAGE
 ===================================================== */
 
 $("#productImageFile")
@@ -1036,15 +1727,38 @@ $("#productImageFile")
                 5 * 1024 * 1024
             ) {
 
-                selectedFile =
-                    null;
+                selectedFile = null;
 
-                event.target.value =
-                    "";
+                event.target.value = "";
 
                 return msg(
                     "#productMessage",
                     "الصورة أكبر من 5MB."
+                );
+
+            }
+
+
+            const allowedTypes = [
+                "image/jpeg",
+                "image/png",
+                "image/webp"
+            ];
+
+
+            if (
+                !allowedTypes.includes(
+                    selectedFile.type
+                )
+            ) {
+
+                selectedFile = null;
+
+                event.target.value = "";
+
+                return msg(
+                    "#productMessage",
+                    "نوع الصورة غير مدعوم."
                 );
 
             }
@@ -1057,8 +1771,7 @@ $("#productImageFile")
 
 
             $("#imagePreview")
-                .innerHTML =
-                `
+                .innerHTML = `
                     <img
                         src="${url}"
                         alt="معاينة"
@@ -1100,8 +1813,8 @@ async function saveProduct() {
     const category =
         categories.find(
             c =>
-                c.id ===
-                categoryId
+                String(c.id) ===
+                String(categoryId)
         );
 
 
@@ -1144,8 +1857,8 @@ async function saveProduct() {
     let imageUrl =
         products.find(
             p =>
-                p.id ===
-                editingProductId
+                String(p.id) ===
+                String(editingProductId)
         )?.image_url ||
         null;
 
@@ -1161,6 +1874,13 @@ async function saveProduct() {
 
         const path =
             `products/${crypto.randomUUID()}.${extension}`;
+
+
+        msg(
+            "#productMessage",
+            "جاري رفع الصورة...",
+            false
+        );
 
 
         const upload =
@@ -1237,10 +1957,16 @@ async function saveProduct() {
             ) || 0,
 
         updated_at:
-            new Date()
-                .toISOString()
+            now()
 
     };
+
+
+    msg(
+        "#productMessage",
+        "جاري حفظ المنتج...",
+        false
+    );
 
 
     const result =
@@ -1270,7 +1996,7 @@ async function saveProduct() {
 
 
     $("#productModal")
-        .classList
+        ?.classList
         .add("hidden");
 
 
@@ -1286,11 +2012,15 @@ async function toggleProduct(id) {
 
     const product =
         products.find(
-            p => p.id === id
+            p =>
+                String(p.id) ===
+                String(id)
         );
 
 
-    if (!product) return;
+    if (!product) {
+        return;
+    }
 
 
     const {
@@ -1299,12 +2029,13 @@ async function toggleProduct(id) {
         await supabase
             .from("products")
             .update({
+
                 active:
                     !product.active,
 
                 updated_at:
-                    new Date()
-                        .toISOString()
+                    now()
+
             })
             .eq(
                 "id",
@@ -1315,6 +2046,1433 @@ async function toggleProduct(id) {
     if (error) {
 
         alert(error.message);
+
+        return;
+    }
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   =====================================================
+   BOOK LIBRARY
+   =====================================================
+   ===================================================== */
+
+
+/* =====================================================
+   BOOK CATEGORY SELECT
+===================================================== */
+
+function fillBookCategorySelect() {
+
+    const select =
+        $("#bookCategory");
+
+
+    if (!select) {
+        return;
+    }
+
+
+    select.innerHTML = `
+        <option value="">
+            اختر قسم الكتاب
+        </option>
+
+        ${bookCategories
+            .map(
+                category => `
+                        <option
+                            value="${esc(category.id)}"
+                        >
+                            ${esc(category.name)}
+                            ${category.active
+                        ? ""
+                        : " — مخفي"
+                    }
+                        </option>
+                    `
+            )
+            .join("")
+        }
+    `;
+}
+
+
+/* =====================================================
+   BOOK CATEGORY ICON
+===================================================== */
+
+function bookCategoryIcon(slug) {
+
+    const icons = {
+
+        law: "⚖",
+
+        legal: "⚖",
+
+        literature: "✒",
+
+        novels: "▤",
+
+        religion: "☾",
+
+        education: "▣",
+
+        children: "♡",
+
+        history: "⌛",
+
+        science: "✦",
+
+        technology: "⌘",
+
+        medicine: "✚",
+
+        business: "◈"
+
+    };
+
+
+    return icons[slug] || "▤";
+}
+
+
+/* =====================================================
+   RENDER BOOK CATEGORIES
+===================================================== */
+
+function renderBookCategories() {
+
+    const container =
+        $("#adminBookCategories");
+
+
+    if (!container) {
+        return;
+    }
+
+
+    if (!bookCategories.length) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                لا توجد أقسام كتب حتى الآن.
+                اضغط على "قسم كتب جديد".
+            </div>
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML =
+        bookCategories
+            .map(
+                category => {
+
+                    const count =
+                        books.filter(
+                            book =>
+                                String(book.category_id) ===
+                                String(category.id)
+                        ).length;
+
+
+                    return `
+                        <article
+                            class="category-admin-card"
+                        >
+
+                            <div class="category-admin-top">
+
+                                <div class="category-admin-icon">
+                                    ${bookCategoryIcon(
+                        category.slug
+                    )}
+                                </div>
+
+
+                                <div>
+
+                                    <strong>
+                                        ${esc(category.name)}
+                                    </strong>
+
+
+                                    ${category.description
+                            ? `
+                                                <p>
+                                                    ${esc(
+                                category.description
+                            )}
+                                                </p>
+                                            `
+                            : ""
+                        }
+
+
+                                    <small>
+                                        ${count}
+                                        ${count === 1
+                            ? " كتاب"
+                            : " كتب"
+                        }
+
+                                        •
+
+                                        الترتيب:
+                                        ${category.sort_order}
+
+                                        •
+
+                                        ${category.active
+                            ? "ظاهر"
+                            : "مخفي"
+                        }
+
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="row-actions">
+
+                                <button
+                                    type="button"
+                                    data-edit-book-category="${esc(
+                            category.id
+                        )}"
+                                >
+                                    تعديل
+                                </button>
+
+
+                                <button
+                                    type="button"
+                                    data-toggle-book-category="${esc(
+                            category.id
+                        )}"
+                                >
+                                    ${category.active
+                            ? "إخفاء"
+                            : "إظهار"
+                        }
+                                </button>
+
+                            </div>
+
+                        </article>
+                    `;
+                }
+            )
+            .join("");
+
+
+    document
+        .querySelectorAll(
+            "[data-edit-book-category]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        openBookCategory(
+                            button.dataset
+                                .editBookCategory
+                        );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            "[data-toggle-book-category]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        toggleBookCategory(
+                            button.dataset
+                                .toggleBookCategory
+                        );
+
+            }
+        );
+}
+
+
+/* =====================================================
+   OPEN BOOK CATEGORY
+===================================================== */
+
+function openBookCategory(id = null) {
+
+    editingBookCategoryId =
+        id;
+
+
+    const category =
+        bookCategories.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    $("#bookCategoryModalTitle")
+        .textContent =
+        id
+            ? "تعديل قسم الكتب"
+            : "إضافة قسم كتب";
+
+
+    $("#bookCategoryId")
+        .value =
+        id || "";
+
+
+    $("#bookCategoryName")
+        .value =
+        category?.name || "";
+
+
+    $("#bookCategoryDescription")
+        .value =
+        category?.description || "";
+
+
+    $("#bookCategoryOrder")
+        .value =
+        category?.sort_order ??
+        bookCategories.length;
+
+
+    $("#bookCategoryActive")
+        .checked =
+        category?.active ??
+        true;
+
+
+    msg(
+        "#bookCategoryMessage",
+        ""
+    );
+
+
+    $("#bookCategoryModal")
+        ?.classList
+        .remove("hidden");
+}
+
+
+/* =====================================================
+   SAVE BOOK CATEGORY
+===================================================== */
+
+async function saveBookCategory() {
+
+    const name =
+        $("#bookCategoryName")
+            ?.value
+            .trim() || "";
+
+
+    if (!name) {
+
+        return msg(
+            "#bookCategoryMessage",
+            "اكتب اسم قسم الكتب."
+        );
+
+    }
+
+
+    let slug;
+
+
+    if (editingBookCategoryId) {
+
+        const oldCategory =
+            bookCategories.find(
+                category =>
+                    String(category.id) ===
+                    String(editingBookCategoryId)
+            );
+
+
+        slug =
+            oldCategory?.slug ||
+            `book-category-${editingBookCategoryId}`;
+
+    } else {
+
+        const baseSlug =
+            name
+                .toLowerCase()
+                .replace(
+                    /[^\p{L}\p{N}]+/gu,
+                    "-"
+                )
+                .replace(
+                    /^-|-$/g,
+                    ""
+                );
+
+
+        slug =
+            `${baseSlug}-${crypto
+                .randomUUID()
+                .slice(0, 8)}`;
+    }
+
+
+    const payload = {
+
+        name,
+
+        slug,
+
+        description:
+            $("#bookCategoryDescription")
+                ?.value
+                .trim() || "",
+
+        sort_order:
+            Number(
+                $("#bookCategoryOrder")
+                    ?.value
+            ) || 0,
+
+        active:
+            $("#bookCategoryActive")
+                ?.checked ??
+            true,
+
+        updated_at:
+            now()
+
+    };
+
+
+    msg(
+        "#bookCategoryMessage",
+        "جاري الحفظ...",
+        false
+    );
+
+
+    const result =
+        editingBookCategoryId
+
+            ? await supabase
+                .from("book_categories")
+                .update(payload)
+                .eq(
+                    "id",
+                    editingBookCategoryId
+                )
+
+            : await supabase
+                .from("book_categories")
+                .insert(payload);
+
+
+    if (result.error) {
+
+        return msg(
+            "#bookCategoryMessage",
+            "تعذر حفظ قسم الكتب: " +
+            result.error.message
+        );
+
+    }
+
+
+    $("#bookCategoryModal")
+        ?.classList
+        .add("hidden");
+
+
+    editingBookCategoryId =
+        null;
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   TOGGLE BOOK CATEGORY
+===================================================== */
+
+async function toggleBookCategory(id) {
+
+    const category =
+        bookCategories.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    if (!category) {
+        return;
+    }
+
+
+    const {
+        error
+    } =
+        await supabase
+            .from("book_categories")
+            .update({
+
+                active:
+                    !category.active,
+
+                updated_at:
+                    now()
+
+            })
+            .eq(
+                "id",
+                id
+            );
+
+
+    if (error) {
+
+        alert(
+            "تعذر تغيير حالة قسم الكتب:\n" +
+            error.message
+        );
+
+        return;
+    }
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   RENDER BOOKS
+===================================================== */
+
+function renderBooks() {
+
+    const container =
+        $("#adminBooks");
+
+
+    if (!container) {
+        return;
+    }
+
+
+    if (!books.length) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                لا توجد كتب حتى الآن.
+                اضغط على "كتاب جديد" لإضافة أول كتاب.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML =
+        books
+            .map(
+                book => {
+
+                    const category =
+                        bookCategories.find(
+                            item =>
+                                String(item.id) ===
+                                String(book.category_id)
+                        );
+
+
+                    const cover =
+                        book.cover_url
+                            ? `
+                                <img
+                                    src="${esc(book.cover_url)}"
+                                    alt="${esc(book.title)}"
+                                    loading="lazy"
+                                >
+                            `
+                            : `
+                                <div class="admin-placeholder">
+                                    بدون غلاف
+                                </div>
+                            `;
+
+
+                    return `
+                        <article
+                            class="admin-book-card"
+                        >
+
+                            <div class="admin-book-cover">
+                                ${cover}
+                            </div>
+
+
+                            <div class="admin-book-main">
+
+                                <span class="eyebrow">
+                                    ${esc(
+                        category?.name ||
+                        "بدون قسم"
+                    )
+                        }
+                                </span>
+
+
+                                <h3>
+                                    ${esc(book.title)}
+                                </h3>
+
+
+                                ${book.author
+                            ? `
+                                            <p>
+                                                المؤلف:
+                                                ${esc(book.author)}
+                                            </p>
+                                        `
+                            : ""
+                        }
+
+
+                                ${Number(book.pages) > 0
+                            ? `
+                                            <small>
+                                                ${money(book.pages)}
+                                                صفحة
+                                            </small>
+                                        `
+                            : ""
+                        }
+
+
+                                <div class="admin-book-status">
+
+                                    <span
+                                        class="status ${book.active
+                            ? "on"
+                            : "off"
+                        }"
+                                    >
+                                        ${book.active
+                            ? "ظاهر"
+                            : "مخفي"
+                        }
+                                    </span>
+
+
+                                    <span>
+                                        ${book.pdf_url
+                            ? "PDF متاح"
+                            : "بدون PDF"
+                        }
+                                    </span>
+
+                                </div>
+
+
+                                <div class="row-actions">
+
+                                    <button
+                                        type="button"
+                                        data-edit-book="${esc(book.id)}"
+                                    >
+                                        تعديل
+                                    </button>
+
+
+                                    <button
+                                        type="button"
+                                        data-toggle-book="${esc(book.id)}"
+                                    >
+                                        ${book.active
+                            ? "إخفاء"
+                            : "إظهار"
+                        }
+                                    </button>
+
+
+                                    <button
+                                        type="button"
+                                        data-delete-book="${esc(book.id)}"
+                                        class="danger-btn"
+                                    >
+                                        حذف
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        </article>
+                    `;
+                }
+            )
+            .join("");
+
+
+    document
+        .querySelectorAll(
+            "[data-edit-book]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        openBook(
+                            button.dataset.editBook
+                        );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            "[data-toggle-book]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        toggleBook(
+                            button.dataset.toggleBook
+                        );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            "[data-delete-book]"
+        )
+        .forEach(
+            button => {
+
+                button.onclick =
+                    () =>
+                        deleteBook(
+                            button.dataset.deleteBook
+                        );
+
+            }
+        );
+}
+
+
+/* =====================================================
+   OPEN BOOK
+===================================================== */
+
+function openBook(id = null) {
+
+    editingBookId =
+        id;
+
+
+    selectedBookCover = null;
+
+    selectedBookPdf = null;
+
+
+    const book =
+        books.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    $("#bookModalTitle")
+        .textContent =
+        id
+            ? "تعديل الكتاب"
+            : "إضافة كتاب";
+
+
+    $("#bookId")
+        .value =
+        id || "";
+
+
+    $("#bookTitle")
+        .value =
+        book?.title || "";
+
+
+    $("#bookCategory")
+        .value =
+        book?.category_id || "";
+
+
+    $("#bookAuthor")
+        .value =
+        book?.author || "";
+
+
+    $("#bookDescription")
+        .value =
+        book?.description || "";
+
+
+    $("#bookPages")
+        .value =
+        book?.pages ?? "";
+
+
+    $("#bookOrder")
+        .value =
+        book?.sort_order ??
+        books.length;
+
+
+    $("#bookActive")
+        .checked =
+        book?.active ??
+        true;
+
+
+    $("#bookCoverFile")
+        .value =
+        "";
+
+
+    $("#bookPdfFile")
+        .value =
+        "";
+
+
+    const coverPreview =
+        $("#bookCoverPreview");
+
+
+    if (coverPreview) {
+
+        if (book?.cover_url) {
+
+            coverPreview.innerHTML = `
+                <img
+                    src="${esc(book.cover_url)}"
+                    alt=""
+                >
+            `;
+
+        } else {
+
+            coverPreview.innerHTML = `
+                <div class="admin-placeholder">
+                    لا يوجد غلاف
+                </div>
+            `;
+
+        }
+
+    }
+
+
+    const pdfStatus =
+        $("#bookPdfStatus");
+
+
+    if (pdfStatus) {
+
+        pdfStatus.innerHTML =
+            book?.pdf_url
+                ? `
+                    <span class="status on">
+                        ملف PDF موجود
+                    </span>
+                `
+                : `
+                    <span class="status off">
+                        لا يوجد ملف PDF
+                    </span>
+                `;
+
+    }
+
+
+    msg(
+        "#bookMessage",
+        ""
+    );
+
+
+    $("#bookModal")
+        ?.classList
+        .remove("hidden");
+}
+
+
+/* =====================================================
+   BOOK COVER FILE
+===================================================== */
+
+$("#bookCoverFile")
+    ?.addEventListener(
+        "change",
+        event => {
+
+            selectedBookCover =
+                event.target.files[0] ||
+                null;
+
+
+            if (!selectedBookCover) {
+                return;
+            }
+
+
+            const allowedTypes = [
+                "image/jpeg",
+                "image/png",
+                "image/webp"
+            ];
+
+
+            if (
+                !allowedTypes.includes(
+                    selectedBookCover.type
+                )
+            ) {
+
+                selectedBookCover = null;
+
+                event.target.value = "";
+
+                return msg(
+                    "#bookMessage",
+                    "غلاف الكتاب يجب أن يكون JPG أو PNG أو WEBP."
+                );
+
+            }
+
+
+            if (
+                selectedBookCover.size >
+                5 * 1024 * 1024
+            ) {
+
+                selectedBookCover = null;
+
+                event.target.value = "";
+
+                return msg(
+                    "#bookMessage",
+                    "حجم غلاف الكتاب يجب ألا يتجاوز 5MB."
+                );
+
+            }
+
+
+            const url =
+                URL.createObjectURL(
+                    selectedBookCover
+                );
+
+
+            $("#bookCoverPreview")
+                .innerHTML = `
+                    <img
+                        src="${url}"
+                        alt="معاينة الغلاف"
+                    >
+                `;
+        }
+    );
+
+
+/* =====================================================
+   BOOK PDF FILE
+===================================================== */
+
+$("#bookPdfFile")
+    ?.addEventListener(
+        "change",
+        event => {
+
+            selectedBookPdf =
+                event.target.files[0] ||
+                null;
+
+
+            if (!selectedBookPdf) {
+                return;
+            }
+
+
+            if (
+                selectedBookPdf.type !==
+                "application/pdf"
+            ) {
+
+                selectedBookPdf = null;
+
+                event.target.value = "";
+
+                return msg(
+                    "#bookMessage",
+                    "الملف يجب أن يكون بصيغة PDF فقط."
+                );
+
+            }
+
+
+            $("#bookPdfStatus")
+                .innerHTML = `
+                    <span class="status on">
+                        تم اختيار:
+                        ${esc(selectedBookPdf.name)}
+                    </span>
+                `;
+        }
+    );
+
+
+/* =====================================================
+   UPLOAD BOOK FILE
+===================================================== */
+
+async function uploadBookFile(
+    file,
+    folder
+) {
+
+    if (!file) {
+        return null;
+    }
+
+
+    const extension =
+        file.name
+            .split(".")
+            .pop()
+            .toLowerCase();
+
+
+    const path =
+        `${folder}/${crypto.randomUUID()}.${extension}`;
+
+
+    const upload =
+        await supabase
+            .storage
+            .from("book-library")
+            .upload(
+                path,
+                file,
+                {
+                    upsert: false,
+                    contentType:
+                        file.type
+                }
+            );
+
+
+    if (upload.error) {
+
+        throw new Error(
+            upload.error.message
+        );
+
+    }
+
+
+    const publicUrl =
+        supabase
+            .storage
+            .from("book-library")
+            .getPublicUrl(path)
+            .data
+            .publicUrl;
+
+
+    return publicUrl;
+}
+
+
+/* =====================================================
+   SAVE BOOK
+===================================================== */
+
+async function saveBook() {
+
+    const title =
+        $("#bookTitle")
+            ?.value
+            .trim() || "";
+
+
+    const categoryId =
+        $("#bookCategory")
+            ?.value || "";
+
+
+    const author =
+        $("#bookAuthor")
+            ?.value
+            .trim() || "";
+
+
+    const description =
+        $("#bookDescription")
+            ?.value
+            .trim() || "";
+
+
+    const pagesText =
+        $("#bookPages")
+            ?.value
+            .trim() || "";
+
+
+    const pages =
+        pagesText === ""
+            ? null
+            : Number(pagesText);
+
+
+    const sortOrder =
+        Number(
+            $("#bookOrder")
+                ?.value
+        ) || 0;
+
+
+    const active =
+        $("#bookActive")
+            ?.checked ??
+        true;
+
+
+    if (!title) {
+
+        return msg(
+            "#bookMessage",
+            "اكتب اسم الكتاب."
+        );
+
+    }
+
+
+    if (!categoryId) {
+
+        return msg(
+            "#bookMessage",
+            "اختر قسم الكتاب."
+        );
+
+    }
+
+
+    if (
+        pages !== null &&
+        (
+            !Number.isInteger(pages) ||
+            pages < 0
+        )
+    ) {
+
+        return msg(
+            "#bookMessage",
+            "عدد الصفحات يجب أن يكون رقمًا صحيحًا."
+        );
+
+    }
+
+
+    const oldBook =
+        books.find(
+            item =>
+                String(item.id) ===
+                String(editingBookId)
+        );
+
+
+    let coverUrl =
+        oldBook?.cover_url ||
+        null;
+
+
+    let pdfUrl =
+        oldBook?.pdf_url ||
+        null;
+
+
+    try {
+
+        /* ---------------------------------------------
+           COVER
+        --------------------------------------------- */
+
+        if (selectedBookCover) {
+
+            msg(
+                "#bookMessage",
+                "جاري رفع غلاف الكتاب...",
+                false
+            );
+
+
+            coverUrl =
+                await uploadBookFile(
+                    selectedBookCover,
+                    "covers"
+                );
+        }
+
+
+        /* ---------------------------------------------
+           PDF
+        --------------------------------------------- */
+
+        if (selectedBookPdf) {
+
+            msg(
+                "#bookMessage",
+                "جاري رفع ملف PDF...",
+                false
+            );
+
+
+            pdfUrl =
+                await uploadBookFile(
+                    selectedBookPdf,
+                    "pdfs"
+                );
+        }
+
+
+    } catch (error) {
+
+        return msg(
+            "#bookMessage",
+            "تعذر رفع الملف: " +
+            error.message
+        );
+
+    }
+
+
+    if (!pdfUrl) {
+
+        return msg(
+            "#bookMessage",
+            "يجب رفع ملف PDF للكتاب."
+        );
+
+    }
+
+
+    const payload = {
+
+        category_id:
+            categoryId,
+
+        title,
+
+        author,
+
+        description,
+
+        cover_url:
+            coverUrl,
+
+        pdf_url:
+            pdfUrl,
+
+        pages,
+
+        active,
+
+        sort_order:
+            sortOrder,
+
+        updated_at:
+            now()
+
+    };
+
+
+    msg(
+        "#bookMessage",
+        "جاري حفظ الكتاب...",
+        false
+    );
+
+
+    const result =
+        editingBookId
+
+            ? await supabase
+                .from("books")
+                .update(payload)
+                .eq(
+                    "id",
+                    editingBookId
+                )
+
+            : await supabase
+                .from("books")
+                .insert(payload);
+
+
+    if (result.error) {
+
+        return msg(
+            "#bookMessage",
+            "تعذر حفظ الكتاب: " +
+            result.error.message
+        );
+
+    }
+
+
+    $("#bookModal")
+        ?.classList
+        .add("hidden");
+
+
+    editingBookId = null;
+
+    selectedBookCover = null;
+
+    selectedBookPdf = null;
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   TOGGLE BOOK
+===================================================== */
+
+async function toggleBook(id) {
+
+    const book =
+        books.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    if (!book) {
+        return;
+    }
+
+
+    const {
+        error
+    } =
+        await supabase
+            .from("books")
+            .update({
+
+                active:
+                    !book.active,
+
+                updated_at:
+                    now()
+
+            })
+            .eq(
+                "id",
+                id
+            );
+
+
+    if (error) {
+
+        alert(
+            "تعذر تغيير حالة الكتاب:\n" +
+            error.message
+        );
+
+        return;
+    }
+
+
+    await loadAll();
+}
+
+
+/* =====================================================
+   DELETE BOOK
+===================================================== */
+
+async function deleteBook(id) {
+
+    const book =
+        books.find(
+            item =>
+                String(item.id) ===
+                String(id)
+        );
+
+
+    if (!book) {
+        return;
+    }
+
+
+    const confirmed =
+        confirm(
+            `هل أنت متأكد من حذف الكتاب؟\n\n${book.title}`
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const {
+        error
+    } =
+        await supabase
+            .from("books")
+            .delete()
+            .eq(
+                "id",
+                id
+            );
+
+
+    if (error) {
+
+        alert(
+            "تعذر حذف الكتاب:\n" +
+            error.message
+        );
 
         return;
     }
@@ -1386,12 +3544,17 @@ async function login() {
    EVENTS
 ===================================================== */
 
+
+/* LOGIN */
+
 $("#adminLoginBtn")
     ?.addEventListener(
         "click",
         login
     );
 
+
+/* LOGOUT */
 
 $("#logoutBtn")
     ?.addEventListener(
@@ -1405,6 +3568,8 @@ $("#logoutBtn")
         }
     );
 
+
+/* PRODUCT CATEGORY */
 
 $("#addCategoryBtn")
     ?.addEventListener(
@@ -1421,6 +3586,8 @@ $("#saveCategoryBtn")
     );
 
 
+/* PRODUCT */
+
 $("#addProductBtn")
     ?.addEventListener(
         "click",
@@ -1435,6 +3602,25 @@ $("#saveProductBtn")
         saveProduct
     );
 
+
+/* NEWS */
+
+$("#addNewsBtn")
+    ?.addEventListener(
+        "click",
+        () =>
+            openNews()
+    );
+
+
+$("#saveNewsBtn")
+    ?.addEventListener(
+        "click",
+        saveNews
+    );
+
+
+/* PRODUCT SEARCH */
 
 $("#categorySearch")
     ?.addEventListener(
@@ -1456,6 +3642,58 @@ $("#productCategoryFilter")
         renderProducts
     );
 
+
+/* BOOK CATEGORY */
+
+$("#addBookCategoryBtn")
+    ?.addEventListener(
+        "click",
+        () =>
+            openBookCategory()
+    );
+
+
+$("#saveBookCategoryBtn")
+    ?.addEventListener(
+        "click",
+        saveBookCategory
+    );
+
+
+/* BOOK */
+
+$("#addBookBtn")
+    ?.addEventListener(
+        "click",
+        () =>
+            openBook()
+    );
+
+
+$("#saveBookBtn")
+    ?.addEventListener(
+        "click",
+        saveBook
+    );
+
+
+/* BOOK SEARCH */
+
+$("#bookSearch")
+    ?.addEventListener(
+        "input",
+        renderBooks
+    );
+
+
+$("#bookCategoryFilter")
+    ?.addEventListener(
+        "change",
+        renderBooks
+    );
+
+
+/* CLOSE MODALS */
 
 document
     .querySelectorAll(
@@ -1479,6 +3717,8 @@ document
         }
     );
 
+
+/* ENTER LOGIN */
 
 $("#adminPassword")
     ?.addEventListener(

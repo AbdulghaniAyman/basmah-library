@@ -1,105 +1,1277 @@
-import {
-    createClient
-} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
-import {
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-} from "./config.js";
-
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 
 const supabase = createClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY
 );
 
+/* =========================================================
+   SETTINGS
+========================================================= */
+
 const WHATSAPP = "201020867958";
+const BOOK_BUCKET = "book-library";
 
-const $ = selector =>
-    document.querySelector(selector);
+/* =========================================================
+   HELPERS
+========================================================= */
 
-const esc = value =>
-    String(value ?? "").replace(
-        /[&<>"']/g,
-        char => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        }[char])
-    );
+const $ = (selector) => document.querySelector(selector);
 
-const money = value =>
-    Number(value).toLocaleString(
-        "ar-EG",
-        {
-            maximumFractionDigits: 2
-        }
-    );
+function esc(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
+function money(value) {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return "";
+    }
+
+    const number = Number(value);
+
+    if (Number.isNaN(number)) {
+        return esc(value);
+    }
+
+    return new Intl.NumberFormat("ar-EG").format(number);
+}
+
+/* =========================================================
+   DATA
+========================================================= */
 
 let categories = [];
 let products = [];
+let newsItems = [];
+
+let bookCategories = [];
+let books = [];
+
 let selectedCategory = null;
+let selectedBookCategory = null;
 
-
-/* =====================================================
+/* =========================================================
    WHATSAPP
-===================================================== */
+========================================================= */
 
 function whatsappUrl(product) {
+    let priceText = "السعر حسب التصميم";
 
-    let text =
-        `مرحباً مكتبة بصمة، أريد طلب المنتج: ${product.name}`;
-
-    if (
+    if (product.price_note) {
+        priceText = product.price_note;
+    } else if (
         product.price !== null &&
         product.price !== undefined &&
-        Number(product.price) > 0
+        product.price !== ""
     ) {
-        text +=
-            ` — ${money(product.price)} ج.م`;
+        priceText = `${money(product.price)} ج.م`;
     }
 
-    return `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(text)}`;
+    const message =
+        `مرحبًا، أريد الاستفسار عن المنتج:\n` +
+        `الاسم: ${product.name}\n` +
+        `السعر: ${priceText}`;
+
+    return (
+        `https://wa.me/${WHATSAPP}?text=` +
+        encodeURIComponent(message)
+    );
 }
 
+/* =========================================================
+   CATEGORY ICONS
+========================================================= */
 
-/* =====================================================
-   ICONS
-===================================================== */
+const categoryIcons = {
+    "printing": "🖨️",
+    "stickers-paper": "🏷️",
+    "paper-sticker-innovations": "📄",
+    "awards": "🏆",
+    "metal-medals": "🥇",
+    "printed-mugs": "☕",
+    "vinyl-stickers": "✨",
+    "flowers-accessories": "🌸",
+    "clothing": "👕",
+    "graduation": "🎓",
+    "baby": "👶",
+    "wedding": "💍"
+};
 
-function categoryIcon(slug) {
+const bookCategoryIcons = {
+    "law": "⚖️",
+    "literature": "📚",
+    "education": "🎓",
+    "children": "🧒",
+    "religion": "📖",
+    "general": "📘"
+};
 
-    const icons = {
-        printing: "▣",
-        "stickers-paper": "◇",
-        "paper-innovations": "✦",
-        awards: "★",
-        "metal-medals": "◈",
-        mugs: "☕",
-        vinyl: "✎",
-        "flowers-accessories": "❖",
-        clothing: "▱",
-        graduation: "⌑",
-        baby: "♡",
-        weddings: "♢"
+/* =========================================================
+   CATEGORY IMAGES
+========================================================= */
+
+function categoryImage(category) {
+    const images = {
+        "printing": "assets/images/categories/printing.jpg",
+        "stickers-paper": "assets/images/categories/stickers-paper.jpg",
+        "paper-sticker-innovations": "assets/images/categories/paper-sticker-innovations.jpg",
+        "awards": "assets/images/categories/awards.jpg",
+        "metal-medals": "assets/images/categories/metal-medals.jpg",
+        "printed-mugs": "assets/images/categories/printed-mugs.jpg",
+        "vinyl-stickers": "assets/images/categories/vinyl-stickers.jpg",
+        "flowers-accessories": "assets/images/categories/flowers-accessories.jpg",
+        "clothing": "assets/images/categories/clothing.jpg",
+        "graduation": "assets/images/categories/graduation.jpg",
+        "baby": "assets/images/categories/baby.jpg",
+        "wedding": "assets/images/categories/wedding.jpg"
     };
 
-    return icons[slug] || "✦";
+    return images[category.slug] || "";
 }
 
+/* =========================================================
+   NEWS TICKER
+========================================================= */
 
-/* =====================================================
-   LOAD
-===================================================== */
+function renderNews() {
+    const ticker = $("#newsTicker");
+
+    if (!ticker) {
+        return;
+    }
+
+    if (!newsItems.length) {
+        ticker.innerHTML = `
+            <span class="ticker-item">
+                أهلاً بكم في مكتبة بصمة
+            </span>
+
+            <span class="ticker-item">
+                اطبع، صمم، وخلّي فكرتك حقيقة
+            </span>
+
+            <span class="ticker-item">
+                خدمات الطباعة والهدايا والتصميم متاحة الآن
+            </span>
+        `;
+
+        prepareNewsTicker();
+        return;
+    }
+
+    const newsHtml = newsItems
+        .map(
+            (item) => `
+                <span class="ticker-item">
+                    ${esc(item.text)}
+                </span>
+            `
+        )
+        .join("");
+
+    /*
+     * نكرر الأخبار حتى تستمر الحركة بدون فراغ.
+     */
+    ticker.innerHTML = newsHtml + newsHtml;
+
+    prepareNewsTicker();
+}
+
+function prepareNewsTicker() {
+    const ticker = $("#newsTicker");
+
+    if (!ticker) {
+        return;
+    }
+
+    /*
+     * نجعل عرض المحتوى مناسبًا للحركة.
+     */
+    ticker.style.width = "max-content";
+
+    /*
+     * سرعة الشريط:
+     * 12 ثانية = سرعة 2× تقريبًا.
+     */
+    ticker.style.animationDuration = "12s";
+}
+
+/* =========================================================
+   CATEGORIES
+========================================================= */
+
+function categoryCard(category) {
+    const icon =
+        categoryIcons[category.slug] || "📦";
+
+    const image =
+        categoryImage(category);
+
+    return `
+        <button
+            class="category-card"
+            type="button"
+            data-category="${esc(category.id)}"
+        >
+
+            <div class="category-card-image">
+
+                ${image
+            ? `
+                            <img
+                                src="${esc(image)}"
+                                alt="${esc(category.name)}"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        `
+            : `
+                            <div class="category-card-icon">
+                                ${icon}
+                            </div>
+                        `
+        }
+
+            </div>
+
+            <div class="category-card-content">
+
+                <h3>
+                    ${esc(category.name)}
+                </h3>
+
+                ${category.description
+            ? `
+                            <p>
+                                ${esc(category.description)}
+                            </p>
+                        `
+            : ""
+        }
+
+            </div>
+
+        </button>
+    `;
+}
+
+function renderCategories() {
+    const grid =
+        $("#categoryGrid");
+
+    if (!grid) {
+        return;
+    }
+
+    if (!categories.length) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                لا توجد أقسام متاحة حاليًا.
+            </div>
+        `;
+
+        return;
+    }
+
+    grid.innerHTML =
+        categories
+            .map(categoryCard)
+            .join("");
+
+    grid
+        .querySelectorAll("[data-category]")
+        .forEach((button) => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    selectedCategory =
+                        button.dataset.category;
+
+                    const catalog =
+                        $("#catalog");
+
+                    if (catalog) {
+                        catalog.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start"
+                        });
+                    }
+
+                    renderProducts();
+                }
+            );
+        });
+}
+
+/* =========================================================
+   PRODUCTS
+========================================================= */
+
+function productImage(product) {
+    if (product.image_url) {
+        return product.image_url;
+    }
+
+    return "";
+}
+
+function productCard(product) {
+    const image =
+        productImage(product);
+
+    let priceHtml = "";
+
+    if (product.price_note) {
+
+        priceHtml = `
+            <div class="product-price">
+                ${esc(product.price_note)}
+            </div>
+        `;
+
+    } else if (
+        product.price !== null &&
+        product.price !== undefined &&
+        product.price !== ""
+    ) {
+
+        priceHtml = `
+            <div class="product-price">
+                ${money(product.price)} ج.م
+            </div>
+        `;
+
+    } else {
+
+        priceHtml = `
+            <div class="product-price">
+                حسب التصميم
+            </div>
+        `;
+    }
+
+    return `
+        <article class="product-card">
+
+            <div class="product-image">
+
+                ${image
+            ? `
+                            <img
+                                src="${esc(image)}"
+                                alt="${esc(product.name)}"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        `
+            : `
+                            <div class="product-image-placeholder">
+                                <span>بصمة</span>
+                            </div>
+                        `
+        }
+
+            </div>
+
+            <div class="product-content">
+
+                <h3>
+                    ${esc(product.name)}
+                </h3>
+
+                ${product.description
+            ? `
+                            <p>
+                                ${esc(product.description)}
+                            </p>
+                        `
+            : ""
+        }
+
+                ${priceHtml}
+
+                <a
+                    class="product-order-btn"
+                    href="${whatsappUrl(product)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    اطلب عبر واتساب
+                </a>
+
+            </div>
+
+        </article>
+    `;
+}
+
+function renderProducts() {
+    const container =
+        $("#productSections");
+
+    if (!container) {
+        return;
+    }
+
+    const searchInput =
+        $("#searchInput");
+
+    const searchTerm =
+        searchInput
+            ? searchInput.value
+                .trim()
+                .toLowerCase()
+            : "";
+
+    let filteredProducts =
+        [...products];
+
+    if (selectedCategory) {
+
+        filteredProducts =
+            filteredProducts.filter(
+                (product) =>
+                    product.category_id ===
+                    selectedCategory
+            );
+    }
+
+    if (searchTerm) {
+
+        filteredProducts =
+            filteredProducts.filter(
+                (product) => {
+
+                    const text = [
+                        product.name,
+                        product.description,
+                        product.category
+                    ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .toLowerCase();
+
+                    return text.includes(
+                        searchTerm
+                    );
+                }
+            );
+    }
+
+    if (!filteredProducts.length) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                لا توجد منتجات مطابقة للبحث حاليًا.
+            </div>
+        `;
+
+        return;
+    }
+
+    const sections = [];
+
+    categories.forEach(
+        (category) => {
+
+            const categoryProducts =
+                filteredProducts.filter(
+                    (product) =>
+                        product.category_id ===
+                        category.id
+                );
+
+            if (!categoryProducts.length) {
+                return;
+            }
+
+            sections.push(`
+                <section class="product-section">
+
+                    <div class="section-head">
+
+                        <div>
+
+                            <span class="eyebrow">
+                                ${esc(category.name)}
+                            </span>
+
+                            <h2>
+                                ${esc(category.name)}
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                    <div class="products-grid">
+
+                        ${categoryProducts
+                    .map(productCard)
+                    .join("")}
+
+                    </div>
+
+                </section>
+            `);
+        }
+    );
+
+    /*
+     * المنتجات القديمة التي لا تحتوي
+     * على category_id.
+     */
+    const uncategorizedProducts =
+        filteredProducts.filter(
+            (product) =>
+                !product.category_id ||
+                !categories.some(
+                    (category) =>
+                        category.id ===
+                        product.category_id
+                )
+        );
+
+    if (uncategorizedProducts.length) {
+
+        sections.push(`
+            <section class="product-section">
+
+                <div class="section-head">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            BASMAH LIBRARY
+                        </span>
+
+                        <h2>
+                            منتجات أخرى
+                        </h2>
+
+                    </div>
+
+                </div>
+
+                <div class="products-grid">
+
+                    ${uncategorizedProducts
+                .map(productCard)
+                .join("")}
+
+                </div>
+
+            </section>
+        `);
+    }
+
+    container.innerHTML =
+        sections.join("");
+}
+
+/* =========================================================
+   BOOK COVER URL
+========================================================= */
+
+function getBookCoverUrl(book) {
+
+    if (!book || !book.cover_url) {
+        return "";
+    }
+
+    const rawValue =
+        String(book.cover_url).trim();
+
+    if (!rawValue) {
+        return "";
+    }
+
+    /*
+     * إذا كان رابطًا كاملًا:
+     * https://...
+     */
+    if (
+        rawValue.startsWith("https://") ||
+        rawValue.startsWith("http://")
+    ) {
+        return rawValue;
+    }
+
+    /*
+     * إذا كان Storage Path:
+     *
+     * covers/book.jpg
+     */
+    let storagePath =
+        rawValue;
+
+    if (storagePath.startsWith("/")) {
+        storagePath =
+            storagePath.substring(1);
+    }
+
+    /*
+     * إذا كان الموجود في قاعدة البيانات
+     * هو رابط Supabase Public كامل.
+     */
+    const publicMarker =
+        `/storage/v1/object/public/${BOOK_BUCKET}/`;
+
+    const markerIndex =
+        storagePath.indexOf(
+            publicMarker
+        );
+
+    if (markerIndex !== -1) {
+
+        storagePath =
+            storagePath.substring(
+                markerIndex +
+                publicMarker.length
+            );
+    }
+
+    /*
+     * فك ترميز المسار.
+     */
+    try {
+
+        storagePath =
+            decodeURIComponent(
+                storagePath
+            );
+
+    } catch {
+        /*
+         * نستخدم المسار كما هو.
+         */
+    }
+
+    const { data } =
+        supabase.storage
+            .from(BOOK_BUCKET)
+            .getPublicUrl(
+                storagePath
+            );
+
+    return data?.publicUrl || "";
+}
+
+/* =========================================================
+   BOOK CATEGORIES
+========================================================= */
+
+function bookCategoryCard(
+    category
+) {
+
+    const icon =
+        bookCategoryIcons[
+        category.slug
+        ] || "📚";
+
+    return `
+        <button
+            class="book-category-card"
+            type="button"
+            data-book-category="${esc(category.id)}"
+        >
+
+            <div class="book-category-icon">
+                ${icon}
+            </div>
+
+            <div>
+
+                <h3>
+                    ${esc(category.name)}
+                </h3>
+
+                ${category.description
+            ? `
+                            <p>
+                                ${esc(category.description)}
+                            </p>
+                        `
+            : ""
+        }
+
+            </div>
+
+        </button>
+    `;
+}
+
+function renderBookCategories() {
+
+    const grid =
+        $("#bookCategoriesGrid");
+
+    if (!grid) {
+        return;
+    }
+
+    if (!bookCategories.length) {
+
+        grid.innerHTML = `
+            <div class="empty-state">
+                لا توجد أقسام كتب متاحة حاليًا.
+            </div>
+        `;
+
+        return;
+    }
+
+    grid.innerHTML =
+        bookCategories
+            .map(bookCategoryCard)
+            .join("");
+
+    grid
+        .querySelectorAll(
+            "[data-book-category]"
+        )
+        .forEach(
+            (button) => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        selectedBookCategory =
+                            button.dataset.bookCategory;
+
+                        renderBooks();
+
+                        const sections =
+                            $("#bookSections");
+
+                        if (sections) {
+
+                            sections.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start"
+                            });
+                        }
+                    }
+                );
+            }
+        );
+}
+
+/* =========================================================
+   BOOK CARD
+========================================================= */
+
+function bookCard(book) {
+
+    const coverUrl =
+        getBookCoverUrl(book);
+
+    const hasCover =
+        Boolean(coverUrl);
+
+    const hasPdf =
+        Boolean(book.pdf_url);
+
+    return `
+        <article class="book-card">
+
+            <div class="book-cover">
+
+                ${hasCover
+            ? `
+                            <img
+                                src="${esc(coverUrl)}"
+                                alt="غلاف ${esc(book.title)}"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        `
+            : ""
+        }
+
+                <div
+                    class="book-cover-fallback"
+                    ${hasCover ? "hidden" : ""}
+                >
+                    <span>📖</span>
+                    <strong>بصمة</strong>
+                </div>
+
+            </div>
+
+            <div class="book-content">
+
+                <h3>
+                    ${esc(book.title)}
+                </h3>
+
+                ${book.author
+            ? `
+                            <div class="book-author">
+                                ${esc(book.author)}
+                            </div>
+                        `
+            : ""
+        }
+
+                ${book.description
+            ? `
+                            <p>
+                                ${esc(book.description)}
+                            </p>
+                        `
+            : ""
+        }
+
+                ${book.pages
+            ? `
+                            <div class="book-pages">
+                                ${money(book.pages)} صفحة
+                            </div>
+                        `
+            : ""
+        }
+
+                <div class="book-actions">
+
+                    ${hasPdf
+            ? `
+                                <button
+                                    class="book-read-btn"
+                                    type="button"
+                                    data-book-id="${esc(book.id)}"
+                                >
+                                    قراءة الكتاب
+                                </button>
+
+                                <a
+                                    class="book-download-btn"
+                                    href="${esc(book.pdf_url)}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download
+                                >
+                                    تحميل PDF
+                                </a>
+                            `
+            : `
+                                <span class="book-unavailable">
+                                    الكتاب غير متاح حاليًا
+                                </span>
+                            `
+        }
+
+                </div>
+
+            </div>
+
+        </article>
+    `;
+}
+
+/* =========================================================
+   BOOK COVER FALLBACK
+========================================================= */
+
+function setupBookCoverFallbacks() {
+
+    document
+        .querySelectorAll(
+            ".book-cover img"
+        )
+        .forEach(
+            (img) => {
+
+                const showFallback =
+                    () => {
+
+                        img.hidden = true;
+
+                        const fallback =
+                            img.parentElement?.querySelector(
+                                ".book-cover-fallback"
+                            );
+
+                        if (fallback) {
+                            fallback.hidden = false;
+                        }
+
+                        console.warn(
+                            "Book cover failed to load:",
+                            img.src
+                        );
+                    };
+
+                const showImage =
+                    () => {
+
+                        img.hidden = false;
+
+                        const fallback =
+                            img.parentElement?.querySelector(
+                                ".book-cover-fallback"
+                            );
+
+                        if (fallback) {
+                            fallback.hidden = true;
+                        }
+                    };
+
+                img.addEventListener(
+                    "error",
+                    showFallback,
+                    { once: true }
+                );
+
+                img.addEventListener(
+                    "load",
+                    showImage
+                );
+
+                /*
+                 * لو الصورة موجودة في Cache.
+                 */
+                if (img.complete) {
+
+                    if (
+                        img.naturalWidth === 0
+                    ) {
+                        showFallback();
+                    } else {
+                        showImage();
+                    }
+                }
+            }
+        );
+}
+
+/* =========================================================
+   BOOKS
+========================================================= */
+
+function renderBooks() {
+
+    const container =
+        $("#bookSections");
+
+    if (!container) {
+        return;
+    }
+
+    let filteredBooks =
+        [...books];
+
+    if (selectedBookCategory) {
+
+        filteredBooks =
+            filteredBooks.filter(
+                (book) =>
+                    book.category_id ===
+                    selectedBookCategory
+            );
+    }
+
+    if (!filteredBooks.length) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                لا توجد كتب متاحة حاليًا في هذا القسم.
+            </div>
+        `;
+
+        return;
+    }
+
+    const sections = [];
+
+    bookCategories.forEach(
+        (category) => {
+
+            const categoryBooks =
+                filteredBooks.filter(
+                    (book) =>
+                        book.category_id ===
+                        category.id
+                );
+
+            if (!categoryBooks.length) {
+                return;
+            }
+
+            sections.push(`
+                <section class="book-section">
+
+                    <div class="section-head">
+
+                        <div>
+
+                            <span class="eyebrow">
+                                BASMAH E-LIBRARY
+                            </span>
+
+                            <h2>
+                                ${esc(category.name)}
+                            </h2>
+
+                        </div>
+
+                    </div>
+
+                    <div class="admin-books-grid">
+
+                        ${categoryBooks
+                    .map(bookCard)
+                    .join("")}
+
+                    </div>
+
+                </section>
+            `);
+        }
+    );
+
+    container.innerHTML =
+        sections.join("");
+
+    setupBookCoverFallbacks();
+
+    container
+        .querySelectorAll(
+            ".book-read-btn"
+        )
+        .forEach(
+            (button) => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        const book =
+                            books.find(
+                                (item) =>
+                                    item.id ===
+                                    button.dataset.bookId
+                            );
+
+                        if (book) {
+                            openBookViewer(book);
+                        }
+                    }
+                );
+            }
+        );
+}
+
+/* =========================================================
+   PDF VIEWER
+========================================================= */
+
+function openBookViewer(book) {
+
+    const modal =
+        $("#bookViewerModal");
+
+    const frame =
+        $("#bookViewerFrame");
+
+    const title =
+        $("#bookViewerTitle");
+
+    const downloadTop =
+        $("#bookDownloadBtn");
+
+    const downloadBottom =
+        $("#bookDownloadBtnBottom");
+
+    if (
+        !modal ||
+        !frame ||
+        !title ||
+        !book?.pdf_url
+    ) {
+        return;
+    }
+
+    title.textContent =
+        book.title ||
+        "قراءة الكتاب";
+
+    frame.src =
+        book.pdf_url;
+
+    if (downloadTop) {
+        downloadTop.href =
+            book.pdf_url;
+    }
+
+    if (downloadBottom) {
+        downloadBottom.href =
+            book.pdf_url;
+    }
+
+    modal.classList.remove(
+        "hidden"
+    );
+
+    modal.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+    document.body.classList.add(
+        "book-viewer-open"
+    );
+}
+
+function closeBookViewer() {
+
+    const modal =
+        $("#bookViewerModal");
+
+    const frame =
+        $("#bookViewerFrame");
+
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.add(
+        "hidden"
+    );
+
+    modal.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+    if (frame) {
+        frame.src = "";
+    }
+
+    document.body.classList.remove(
+        "book-viewer-open"
+    );
+}
+
+function setupBookViewer() {
+
+    const closeButton =
+        $("#closeBookViewer");
+
+    const closeBottom =
+        $("#bookViewerCloseBtn");
+
+    const modal =
+        $("#bookViewerModal");
+
+    if (closeButton) {
+
+        closeButton.addEventListener(
+            "click",
+            closeBookViewer
+        );
+    }
+
+    if (closeBottom) {
+
+        closeBottom.addEventListener(
+            "click",
+            closeBookViewer
+        );
+    }
+
+    if (modal) {
+
+        modal.addEventListener(
+            "click",
+            (event) => {
+
+                if (
+                    event.target === modal
+                ) {
+                    closeBookViewer();
+                }
+            }
+        );
+    }
+
+    document.addEventListener(
+        "keydown",
+        (event) => {
+
+            if (event.key === "Escape") {
+                closeBookViewer();
+            }
+        }
+    );
+}
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+function setupSearch() {
+
+    const searchInput =
+        $("#searchInput");
+
+    const clearButton =
+        $("#clearFilter");
+
+    if (searchInput) {
+
+        searchInput.addEventListener(
+            "input",
+            () => {
+                renderProducts();
+            }
+        );
+    }
+
+    if (clearButton) {
+
+        clearButton.addEventListener(
+            "click",
+            () => {
+
+                selectedCategory = null;
+
+                if (searchInput) {
+                    searchInput.value = "";
+                }
+
+                renderProducts();
+            }
+        );
+    }
+}
+
+/* =========================================================
+   LOAD DATA
+========================================================= */
 
 async function loadData() {
 
     const [
-        categoryResult,
-        productResult
+        categoriesResult,
+        productsResult,
+        newsResult,
+        bookCategoriesResult,
+        booksResult
     ] = await Promise.all([
 
         supabase
@@ -118,7 +1290,46 @@ async function loadData() {
         supabase
             .from("products")
             .select(
-                "id,name,description,category,category_id,price,price_note,image_url,sort_order"
+                "id,name,description,category,category_id,price,price_note,image_url,sort_order,created_at"
+            )
+            .eq("active", true)
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            ),
+
+        supabase
+            .from("news_ticker")
+            .select(
+                "id,text,active,sort_order,created_at"
+            )
+            .eq("active", true)
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            ),
+
+        supabase
+            .from("book_categories")
+            .select(
+                "id,name,slug,description,sort_order"
+            )
+            .eq("active", true)
+            .order(
+                "sort_order",
+                {
+                    ascending: true
+                }
+            ),
+
+        supabase
+            .from("books")
+            .select(
+                "id,category_id,title,author,description,cover_url,pdf_url,pages,sort_order,created_at"
             )
             .eq("active", true)
             .order(
@@ -127,514 +1338,173 @@ async function loadData() {
                     ascending: true
                 }
             )
-            .order(
-                "created_at",
-                {
-                    ascending: true
-                }
-            )
     ]);
 
+    /* =====================================================
+       CATEGORIES
+    ===================================================== */
 
-    if (categoryResult.error) {
+    if (categoriesResult.error) {
+
         console.error(
-            "Categories:",
-            categoryResult.error
+            "Categories error:",
+            categoriesResult.error
         );
+
+        categories = [];
+
+    } else {
+
+        categories =
+            categoriesResult.data || [];
     }
 
-    if (productResult.error) {
+    /* =====================================================
+       PRODUCTS
+    ===================================================== */
+
+    if (productsResult.error) {
+
         console.error(
-            "Products:",
-            productResult.error
+            "Products error:",
+            productsResult.error
         );
+
+        products = [];
+
+    } else {
+
+        products =
+            productsResult.data || [];
     }
 
+    /* =====================================================
+       NEWS
+    ===================================================== */
 
-    categories =
-        categoryResult.data || [];
+    if (newsResult.error) {
 
-    products =
-        productResult.data || [];
+        console.error(
+            "News ticker error:",
+            newsResult.error
+        );
 
+        newsItems = [];
 
+    } else {
+
+        newsItems =
+            newsResult.data || [];
+    }
+
+    /* =====================================================
+       BOOK CATEGORIES
+    ===================================================== */
+
+    if (bookCategoriesResult.error) {
+
+        console.error(
+            "Book categories error:",
+            bookCategoriesResult.error
+        );
+
+        bookCategories = [];
+
+    } else {
+
+        bookCategories =
+            bookCategoriesResult.data || [];
+    }
+
+    /* =====================================================
+       BOOKS
+    ===================================================== */
+
+    if (booksResult.error) {
+
+        console.error(
+            "Books error:",
+            booksResult.error
+        );
+
+        books = [];
+
+    } else {
+
+        books =
+            booksResult.data || [];
+    }
+
+    console.log(
+        "Basmah data loaded:",
+        {
+            categories:
+                categories.length,
+
+            products:
+                products.length,
+
+            news:
+                newsItems.length,
+
+            bookCategories:
+                bookCategories.length,
+
+            books:
+                books.length
+        }
+    );
+
+    /*
+     * Debug خاص بأغلفة الكتب.
+     */
+    books
+        .filter(
+            (book) =>
+                book.cover_url
+        )
+        .forEach(
+            (book) => {
+
+                console.log(
+                    "Book cover:",
+                    book.title,
+                    "Original:",
+                    book.cover_url,
+                    "Resolved:",
+                    getBookCoverUrl(book)
+                );
+            }
+        );
+
+    renderNews();
     renderCategories();
     renderProducts();
+    renderBookCategories();
+    renderBooks();
 }
 
+/* =========================================================
+   INITIALIZE
+========================================================= */
 
-/* =====================================================
-   CATEGORY IMAGE
-===================================================== */
+document.addEventListener(
+    "DOMContentLoaded",
+    async () => {
 
-function categoryImage(category) {
+        setupSearch();
+        setupBookViewer();
 
-    const slug =
-        category.slug || "";
+        try {
 
+            await loadData();
 
-    if (!slug) {
+        } catch (error) {
 
-        return `
-            <div class="category-placeholder">
-
-                <span>
-                    ${categoryIcon(slug)}
-                </span>
-
-                <small>
-                    صورة القسم
-                </small>
-
-            </div>
-        `;
-
-    }
-
-
-    const path =
-        `assets/images/categories/${slug}.jpg`;
-
-
-    return `
-
-        <img
-            src="${path}"
-            alt="${esc(category.name)}"
-            loading="lazy"
-            onerror="
-                this.style.display='none';
-                this.nextElementSibling.style.display='block';
-            "
-        >
-
-        <div
-            class="category-placeholder"
-            style="display:none;"
-        >
-
-            <span>
-                ${categoryIcon(slug)}
-            </span>
-
-            <small>
-                صورة القسم
-            </small>
-
-        </div>
-    `;
-}
-
-
-/* =====================================================
-   CATEGORIES
-===================================================== */
-
-function renderCategories() {
-
-    const grid =
-        $("#categoryGrid");
-
-    if (!grid) return;
-
-
-    grid.innerHTML =
-        categories
-            .map(
-                (category, index) => `
-
-                    <button
-                        type="button"
-                        class="category-card ${selectedCategory === category.id
-                        ? "active"
-                        : ""
-                    }"
-                        data-category="${category.id}"
-                    >
-
-                        <div class="category-image">
-
-                            ${categoryImage(category)}
-
-                        </div>
-
-
-                        <div class="category-content">
-
-                            <span class="category-icon">
-                                ${categoryIcon(category.slug)}
-                            </span>
-
-
-                            <strong>
-                                ${esc(category.name)}
-                            </strong>
-
-
-                            <small>
-                                ${esc(
-                        category.description ||
-                        "منتجات وتفاصيل القسم"
-                    )}
-                            </small>
-
-                        </div>
-
-
-                        <span class="category-arrow">
-                            ←
-                        </span>
-
-                    </button>
-                `
-            )
-            .join("");
-
-
-    grid
-        .querySelectorAll(
-            "[data-category]"
-        )
-        .forEach(button => {
-
-            button.onclick = () => {
-
-                selectedCategory =
-                    button.dataset.category;
-
-                renderCategories();
-                renderProducts();
-
-
-                $("#catalog")
-                    ?.scrollIntoView({
-                        behavior: "smooth"
-                    });
-            };
-
-        });
-}
-
-
-/* =====================================================
-   PRODUCTS
-===================================================== */
-
-function renderProducts() {
-
-    const search =
-        $("#searchInput")
-            ?.value
-            .trim()
-            .toLowerCase() || "";
-
-
-    const visibleCategories =
-        selectedCategory
-            ? categories.filter(
-                c =>
-                    c.id ===
-                    selectedCategory
-            )
-            : categories;
-
-
-    const container =
-        $("#productSections");
-
-    if (!container) return;
-
-
-    let html = "";
-
-
-    for (
-        const category of visibleCategories
-    ) {
-
-
-        const list =
-            products.filter(product => {
-
-                /*
-                   دعم البيانات الجديدة
-                   والمنتجات القديمة.
-                */
-
-                const belongs =
-                    product.category_id ===
-                    category.id
-
-                    ||
-
-                    (
-                        !product.category_id &&
-                        product.category ===
-                        category.name
-                    );
-
-
-                const matchesSearch =
-                    !search ||
-
-                    `${product.name} ${product.description || ""
-                        }`
-                        .toLowerCase()
-                        .includes(search);
-
-
-                return (
-                    belongs &&
-                    matchesSearch
-                );
-
-            });
-
-
-        if (!list.length) {
-            continue;
+            console.error(
+                "Basmah Library initialization error:",
+                error
+            );
         }
-
-
-        html += `
-
-            <section
-                class="catalog-category"
-                id="cat-${esc(category.slug)}"
-            >
-
-                <div class="catalog-category-head">
-
-                    <div>
-
-                        <span class="eyebrow">
-                            ${esc(
-            category.slug
-                .replaceAll("-", " ")
-                .toUpperCase()
-        )}
-                        </span>
-
-                        <h3>
-                            ${esc(category.name)}
-                        </h3>
-
-                    </div>
-
-
-                    <span>
-                        ${list.length} منتج
-                    </span>
-
-                </div>
-
-
-                <div class="product-grid">
-
-                    ${list
-                .map(productCard)
-                .join("")}
-
-                </div>
-
-            </section>
-
-        `;
     }
-
-
-    if (!html) {
-
-        html = `
-
-            <div class="empty-state">
-
-                لا توجد منتجات مطابقة للبحث حاليًا.
-
-            </div>
-
-        `;
-
-    }
-
-
-    container.innerHTML =
-        html;
-}
-
-
-/* =====================================================
-   PRODUCT CARD
-===================================================== */
-
-function productCard(product) {
-
-    const image =
-        product.image_url
-
-            ? `
-
-                <img
-                    src="${esc(product.image_url)}"
-                    alt="${esc(product.name)}"
-                    loading="lazy"
-                >
-
-              `
-
-            : `
-
-                <div class="product-placeholder">
-
-                    <span>
-                        ✦
-                    </span>
-
-                    <strong>
-                        الصورة تضاف من لوحة الإدارة
-                    </strong>
-
-                </div>
-
-              `;
-
-
-    let price;
-
-
-    if (
-        product.price !== null &&
-        product.price !== undefined &&
-        Number(product.price) > 0
-    ) {
-
-        price = `
-
-            <div class="product-price">
-
-                ${money(product.price)} ج.م
-
-                ${product.price_note
-                ? `
-                            <small>
-                                ${esc(product.price_note)}
-                            </small>
-                          `
-                : ""
-            }
-
-            </div>
-
-        `;
-
-    }
-    else {
-
-        price = `
-
-            <div class="product-price">
-
-                حسب الطلب
-
-                ${product.price_note
-                ? `
-                            <small>
-                                ${esc(product.price_note)}
-                            </small>
-                          `
-                : ""
-            }
-
-            </div>
-
-        `;
-
-    }
-
-
-    return `
-
-        <article class="product-card">
-
-            <div class="product-image">
-
-                ${image}
-
-            </div>
-
-
-            <div class="product-body">
-
-                <h4>
-                    ${esc(product.name)}
-                </h4>
-
-
-                ${product.description
-            ? `
-                            <p>
-                                ${esc(product.description)}
-                            </p>
-                          `
-            : ""
-        }
-
-
-                ${price}
-
-
-                <a
-                    class="order-btn"
-                    href="${whatsappUrl(product)}"
-                    target="_blank"
-                    rel="noopener"
-                >
-                    اطلب
-                </a>
-
-            </div>
-
-        </article>
-
-    `;
-}
-
-
-/* =====================================================
-   SEARCH
-===================================================== */
-
-$("#searchInput")
-    ?.addEventListener(
-        "input",
-        renderProducts
-    );
-
-
-/* =====================================================
-   CLEAR
-===================================================== */
-
-$("#clearFilter")
-    ?.addEventListener(
-        "click",
-        () => {
-
-            selectedCategory = null;
-
-            if ($("#searchInput")) {
-                $("#searchInput").value = "";
-            }
-
-            renderCategories();
-            renderProducts();
-
-        }
-    );
-
-
-/* =====================================================
-   START
-===================================================== */
-
-loadData();
+);
