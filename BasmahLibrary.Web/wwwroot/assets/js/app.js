@@ -46,6 +46,81 @@ function money(value) {
     return new Intl.NumberFormat("ar-EG").format(number);
 }
 
+function isFullUrl(value) {
+    return /^https?:\/\//i.test(
+        String(value || "").trim()
+    );
+}
+
+function cleanStoragePath(value, bucketName) {
+    let path = String(value || "").trim();
+
+    if (!path) {
+        return "";
+    }
+
+    const publicMarker =
+        `/storage/v1/object/public/${bucketName}/`;
+
+    const markerIndex =
+        path.indexOf(publicMarker);
+
+    if (markerIndex !== -1) {
+        path = path.substring(
+            markerIndex + publicMarker.length
+        );
+    }
+
+    const bucketPrefix =
+        `${bucketName}/`;
+
+    if (path.startsWith(bucketPrefix)) {
+        path = path.substring(
+            bucketPrefix.length
+        );
+    }
+
+    path = path.replace(/^\/+/, "");
+
+    try {
+        path = decodeURIComponent(path);
+    } catch {
+        // استخدام المسار كما هو
+    }
+
+    return path;
+}
+
+function getPublicStorageUrl(bucketName, value) {
+    const rawValue =
+        String(value || "").trim();
+
+    if (!rawValue) {
+        return "";
+    }
+
+    if (isFullUrl(rawValue)) {
+        return rawValue;
+    }
+
+    const storagePath =
+        cleanStoragePath(
+            rawValue,
+            bucketName
+        );
+
+    if (!storagePath) {
+        return "";
+    }
+
+    const { data } =
+        supabase.storage
+            .from(bucketName)
+            .getPublicUrl(storagePath);
+
+    return data?.publicUrl || "";
+}
+
 /* =========================================================
    DATA
 ========================================================= */
@@ -67,19 +142,20 @@ let selectedBookCategory = null;
 function whatsappUrl(product) {
     let priceText = "السعر حسب التصميم";
 
-    if (product.price_note) {
+    if (product?.price_note) {
         priceText = product.price_note;
     } else if (
-        product.price !== null &&
-        product.price !== undefined &&
-        product.price !== ""
+        product?.price !== null &&
+        product?.price !== undefined &&
+        product?.price !== ""
     ) {
-        priceText = `${money(product.price)} ج.م`;
+        priceText =
+            `${money(product.price)} ج.م`;
     }
 
     const message =
         `مرحبًا، أريد الاستفسار عن المنتج:\n` +
-        `الاسم: ${product.name}\n` +
+        `الاسم: ${product?.name || ""}\n` +
         `السعر: ${priceText}`;
 
     return (
@@ -122,21 +198,44 @@ const bookCategoryIcons = {
 
 function categoryImage(category) {
     const images = {
-        "printing": "assets/images/categories/printing.jpg",
-        "stickers-paper": "assets/images/categories/stickers-paper.jpg",
-        "paper-sticker-innovations": "assets/images/categories/paper-sticker-innovations.jpg",
-        "awards": "assets/images/categories/awards.jpg",
-        "metal-medals": "assets/images/categories/metal-medals.jpg",
-        "printed-mugs": "assets/images/categories/printed-mugs.jpg",
-        "vinyl-stickers": "assets/images/categories/vinyl-stickers.jpg",
-        "flowers-accessories": "assets/images/categories/flowers-accessories.jpg",
-        "clothing": "assets/images/categories/clothing.jpg",
-        "graduation": "assets/images/categories/graduation.jpg",
-        "baby": "assets/images/categories/baby.jpg",
-        "wedding": "assets/images/categories/wedding.jpg"
+        printing:
+            "assets/images/categories/printing.jpg",
+
+        "stickers-paper":
+            "assets/images/categories/stickers-paper.jpg",
+
+        "paper-sticker-innovations":
+            "assets/images/categories/paper-sticker-innovations.jpg",
+
+        awards:
+            "assets/images/categories/awards.jpg",
+
+        "metal-medals":
+            "assets/images/categories/metal-medals.jpg",
+
+        "printed-mugs":
+            "assets/images/categories/printed-mugs.jpg",
+
+        "vinyl-stickers":
+            "assets/images/categories/vinyl-stickers.jpg",
+
+        "flowers-accessories":
+            "assets/images/categories/flowers-accessories.jpg",
+
+        clothing:
+            "assets/images/categories/clothing.jpg",
+
+        graduation:
+            "assets/images/categories/graduation.jpg",
+
+        baby:
+            "assets/images/categories/baby.jpg",
+
+        wedding:
+            "assets/images/categories/wedding.jpg"
     };
 
-    return images[category.slug] || "";
+    return images[category?.slug] || "";
 }
 
 /* =========================================================
@@ -144,66 +243,71 @@ function categoryImage(category) {
 ========================================================= */
 
 function renderNews() {
-    const ticker = $("#newsTicker");
+    const ticker =
+        $("#newsTicker");
 
-    if (!ticker) {
+    const content =
+        $("#newsTickerContent");
+
+    if (!ticker || !content) {
         return;
     }
 
-    if (!newsItems.length) {
-        ticker.innerHTML = `
-            <span class="ticker-item">
-                أهلاً بكم في مكتبة بصمة
-            </span>
+    let items = [];
 
-            <span class="ticker-item">
-                اطبع، صمم، وخلّي فكرتك حقيقة
-            </span>
-
-            <span class="ticker-item">
-                خدمات الطباعة والهدايا والتصميم متاحة الآن
-            </span>
-        `;
-
-        prepareNewsTicker();
-        return;
+    if (newsItems.length) {
+        items = newsItems
+            .map((item) => String(item.text || "").trim())
+            .filter(Boolean);
     }
 
-    const newsHtml = newsItems
+    if (!items.length) {
+        items = [
+            "أهلاً بكم في مكتبة بصمة",
+            "اطبع، صمم، وخلّي فكرتك حقيقة",
+            "خدمات الطباعة والهدايا والتصميم متاحة الآن"
+        ];
+    }
+
+    const newsHtml = items
         .map(
-            (item) => `
-                <span class="ticker-item">
-                    ${esc(item.text)}
+            (text) => `
+                <span class="news-item">
+                    ${esc(text)}
+                </span>
+
+                <span class="news-separator" aria-hidden="true">
+                    ◆
                 </span>
             `
         )
         .join("");
 
     /*
-     * نكرر الأخبار حتى تستمر الحركة بدون فراغ.
+     * نكرر المحتوى حتى تستمر الحركة بدون انقطاع.
      */
-    ticker.innerHTML = newsHtml + newsHtml;
-
-    prepareNewsTicker();
-}
-
-function prepareNewsTicker() {
-    const ticker = $("#newsTicker");
-
-    if (!ticker) {
-        return;
-    }
+    content.innerHTML =
+        newsHtml + newsHtml;
 
     /*
-     * نجعل عرض المحتوى مناسبًا للحركة.
+     * إظهار الشريط بعد تجهيز المحتوى.
      */
-    ticker.style.width = "max-content";
+    ticker.hidden = false;
+
+    ticker.removeAttribute("aria-hidden");
 
     /*
-     * سرعة الشريط:
-     * 12 ثانية = سرعة 2× تقريبًا.
+     * إعادة تشغيل الحركة عند إعادة تحميل الأخبار.
      */
-    ticker.style.animationDuration = "12s";
+    content.style.animation = "none";
+
+    /*
+     * إجبار المتصفح على إعادة حساب الحركة.
+     */
+    void content.offsetWidth;
+
+    content.style.animation =
+        "basmahNewsMove 18s linear infinite";
 }
 
 /* =========================================================
@@ -212,7 +316,8 @@ function prepareNewsTicker() {
 
 function categoryCard(category) {
     const icon =
-        categoryIcons[category.slug] || "📦";
+        categoryIcons[category.slug] ||
+        "📦";
 
     const image =
         categoryImage(category);
@@ -222,9 +327,10 @@ function categoryCard(category) {
             class="category-card"
             type="button"
             data-category="${esc(category.id)}"
+            aria-label="عرض منتجات ${esc(category.name)}"
         >
 
-            <div class="category-card-image">
+            <div class="category-image">
 
                 ${image
             ? `
@@ -233,18 +339,29 @@ function categoryCard(category) {
                                 alt="${esc(category.name)}"
                                 loading="lazy"
                                 decoding="async"
+                                data-category-image
                             >
                         `
             : `
-                            <div class="category-card-icon">
-                                ${icon}
+                            <div class="category-placeholder">
+                                <span>
+                                    ${icon}
+                                </span>
+
+                                <small>
+                                    ${esc(category.name)}
+                                </small>
                             </div>
                         `
         }
 
             </div>
 
-            <div class="category-card-content">
+            <div class="category-content">
+
+                <div class="category-icon">
+                    ${icon}
+                </div>
 
                 <h3>
                     ${esc(category.name)}
@@ -289,15 +406,70 @@ function renderCategories() {
             .join("");
 
     grid
-        .querySelectorAll("[data-category]")
-        .forEach((button) => {
+        .querySelectorAll(
+            "[data-category-image]"
+        )
+        .forEach((img) => {
+            img.addEventListener(
+                "error",
+                () => {
+                    const wrapper =
+                        img.parentElement;
 
+                    if (!wrapper) {
+                        return;
+                    }
+
+                    const categoryId =
+                        img
+                            .closest(
+                                "[data-category]"
+                            )
+                            ?.dataset
+                            ?.category;
+
+                    const category =
+                        categories.find(
+                            (item) =>
+                                item.id ===
+                                categoryId
+                        );
+
+                    const icon =
+                        category
+                            ? categoryIcons[
+                            category.slug
+                            ] || "📦"
+                            : "📦";
+
+                    wrapper.innerHTML = `
+                        <div class="category-placeholder">
+                            <span>
+                                ${icon}
+                            </span>
+
+                            <small>
+                                ${esc(category?.name || "بصمة")}
+                            </small>
+                        </div>
+                    `;
+                },
+                { once: true }
+            );
+        });
+
+    grid
+        .querySelectorAll(
+            "[data-category]"
+        )
+        .forEach((button) => {
             button.addEventListener(
                 "click",
                 () => {
-
                     selectedCategory =
                         button.dataset.category;
+
+                    updateCategorySelection();
 
                     const catalog =
                         $("#catalog");
@@ -313,6 +485,22 @@ function renderCategories() {
                 }
             );
         });
+
+    updateCategorySelection();
+}
+
+function updateCategorySelection() {
+    document
+        .querySelectorAll(
+            "[data-category]"
+        )
+        .forEach((button) => {
+            button.classList.toggle(
+                "is-selected",
+                button.dataset.category ===
+                selectedCategory
+            );
+        });
 }
 
 /* =========================================================
@@ -320,11 +508,19 @@ function renderCategories() {
 ========================================================= */
 
 function productImage(product) {
-    if (product.image_url) {
-        return product.image_url;
+    if (!product?.image_url) {
+        return "";
     }
 
-    return "";
+    /*
+     * لو image_url رابط كامل نستخدمه كما هو.
+     * ولو كان مسارًا داخل product-images
+     * نحوله إلى Public URL.
+     */
+    return getPublicStorageUrl(
+        "product-images",
+        product.image_url
+    );
 }
 
 function productCard(product) {
@@ -334,27 +530,22 @@ function productCard(product) {
     let priceHtml = "";
 
     if (product.price_note) {
-
         priceHtml = `
             <div class="product-price">
                 ${esc(product.price_note)}
             </div>
         `;
-
     } else if (
         product.price !== null &&
         product.price !== undefined &&
         product.price !== ""
     ) {
-
         priceHtml = `
             <div class="product-price">
                 ${money(product.price)} ج.م
             </div>
         `;
-
     } else {
-
         priceHtml = `
             <div class="product-price">
                 حسب التصميم
@@ -374,10 +565,11 @@ function productCard(product) {
                                 alt="${esc(product.name)}"
                                 loading="lazy"
                                 decoding="async"
+                                data-product-image
                             >
                         `
             : `
-                            <div class="product-image-placeholder">
+                            <div class="product-image-fallback">
                                 <span>بصمة</span>
                             </div>
                         `
@@ -385,36 +577,67 @@ function productCard(product) {
 
             </div>
 
-            <div class="product-content">
+            <div class="product-body">
 
-                <h3>
+                <h3 class="product-title">
                     ${esc(product.name)}
                 </h3>
 
                 ${product.description
             ? `
-                            <p>
+                            <p class="product-description">
                                 ${esc(product.description)}
                             </p>
                         `
             : ""
         }
 
-                ${priceHtml}
+                <div class="product-footer">
 
-                <a
-                    class="product-order-btn"
-                    href="${whatsappUrl(product)}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    اطلب عبر واتساب
-                </a>
+                    ${priceHtml}
+
+                    <a
+                        class="product-order-btn"
+                        href="${whatsappUrl(product)}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        اطلب عبر واتساب
+                    </a>
+
+                </div>
 
             </div>
 
         </article>
     `;
+}
+
+function setupProductImageFallbacks() {
+    document
+        .querySelectorAll(
+            ".product-image img[data-product-image]"
+        )
+        .forEach((img) => {
+            img.addEventListener(
+                "error",
+                () => {
+                    const wrapper =
+                        img.parentElement;
+
+                    if (!wrapper) {
+                        return;
+                    }
+
+                    wrapper.innerHTML = `
+                        <div class="product-image-fallback">
+                            <span>بصمة</span>
+                        </div>
+                    `;
+                },
+                { once: true }
+            );
+        });
 }
 
 function renderProducts() {
@@ -439,7 +662,6 @@ function renderProducts() {
         [...products];
 
     if (selectedCategory) {
-
         filteredProducts =
             filteredProducts.filter(
                 (product) =>
@@ -449,11 +671,9 @@ function renderProducts() {
     }
 
     if (searchTerm) {
-
         filteredProducts =
             filteredProducts.filter(
                 (product) => {
-
                     const text = [
                         product.name,
                         product.description,
@@ -471,13 +691,19 @@ function renderProducts() {
     }
 
     if (!filteredProducts.length) {
-
         container.innerHTML = `
             <div class="empty-state">
-                لا توجد منتجات مطابقة للبحث حاليًا.
+                <strong>
+                    لا توجد نتائج
+                </strong>
+
+                <p>
+                    لا توجد منتجات مطابقة للبحث حاليًا.
+                </p>
             </div>
         `;
 
+        updateFilterState();
         return;
     }
 
@@ -485,7 +711,6 @@ function renderProducts() {
 
     categories.forEach(
         (category) => {
-
             const categoryProducts =
                 filteredProducts.filter(
                     (product) =>
@@ -500,11 +725,11 @@ function renderProducts() {
             sections.push(`
                 <section class="product-section">
 
-                    <div class="section-head">
+                    <div class="catalog-section-heading">
 
                         <div>
 
-                            <span class="eyebrow">
+                            <span class="section-label">
                                 ${esc(category.name)}
                             </span>
 
@@ -529,10 +754,6 @@ function renderProducts() {
         }
     );
 
-    /*
-     * المنتجات القديمة التي لا تحتوي
-     * على category_id.
-     */
     const uncategorizedProducts =
         filteredProducts.filter(
             (product) =>
@@ -545,15 +766,14 @@ function renderProducts() {
         );
 
     if (uncategorizedProducts.length) {
-
         sections.push(`
             <section class="product-section">
 
-                <div class="section-head">
+                <div class="catalog-section-heading">
 
                     <div>
 
-                        <span class="eyebrow">
+                        <span class="section-label">
                             BASMAH LIBRARY
                         </span>
 
@@ -579,104 +799,34 @@ function renderProducts() {
 
     container.innerHTML =
         sections.join("");
+
+    setupProductImageFallbacks();
+    updateFilterState();
 }
 
 /* =========================================================
-   BOOK COVER URL
+   BOOK STORAGE
 ========================================================= */
 
 function getBookCoverUrl(book) {
+    return getPublicStorageUrl(
+        BOOK_BUCKET,
+        book?.cover_url
+    );
+}
 
-    if (!book || !book.cover_url) {
-        return "";
-    }
-
-    const rawValue =
-        String(book.cover_url).trim();
-
-    if (!rawValue) {
-        return "";
-    }
-
-    /*
-     * إذا كان رابطًا كاملًا:
-     * https://...
-     */
-    if (
-        rawValue.startsWith("https://") ||
-        rawValue.startsWith("http://")
-    ) {
-        return rawValue;
-    }
-
-    /*
-     * إذا كان Storage Path:
-     *
-     * covers/book.jpg
-     */
-    let storagePath =
-        rawValue;
-
-    if (storagePath.startsWith("/")) {
-        storagePath =
-            storagePath.substring(1);
-    }
-
-    /*
-     * إذا كان الموجود في قاعدة البيانات
-     * هو رابط Supabase Public كامل.
-     */
-    const publicMarker =
-        `/storage/v1/object/public/${BOOK_BUCKET}/`;
-
-    const markerIndex =
-        storagePath.indexOf(
-            publicMarker
-        );
-
-    if (markerIndex !== -1) {
-
-        storagePath =
-            storagePath.substring(
-                markerIndex +
-                publicMarker.length
-            );
-    }
-
-    /*
-     * فك ترميز المسار.
-     */
-    try {
-
-        storagePath =
-            decodeURIComponent(
-                storagePath
-            );
-
-    } catch {
-        /*
-         * نستخدم المسار كما هو.
-         */
-    }
-
-    const { data } =
-        supabase.storage
-            .from(BOOK_BUCKET)
-            .getPublicUrl(
-                storagePath
-            );
-
-    return data?.publicUrl || "";
+function getBookPdfUrl(book) {
+    return getPublicStorageUrl(
+        BOOK_BUCKET,
+        book?.pdf_url
+    );
 }
 
 /* =========================================================
    BOOK CATEGORIES
 ========================================================= */
 
-function bookCategoryCard(
-    category
-) {
-
+function bookCategoryCard(category) {
     const icon =
         bookCategoryIcons[
         category.slug
@@ -687,23 +837,24 @@ function bookCategoryCard(
             class="book-category-card"
             type="button"
             data-book-category="${esc(category.id)}"
+            aria-label="عرض كتب ${esc(category.name)}"
         >
 
             <div class="book-category-icon">
                 ${icon}
             </div>
 
-            <div>
+            <div class="book-category-content">
 
-                <h3>
+                <strong>
                     ${esc(category.name)}
-                </h3>
+                </strong>
 
                 ${category.description
             ? `
-                            <p>
+                            <small>
                                 ${esc(category.description)}
-                            </p>
+                            </small>
                         `
             : ""
         }
@@ -715,7 +866,6 @@ function bookCategoryCard(
 }
 
 function renderBookCategories() {
-
     const grid =
         $("#bookCategoriesGrid");
 
@@ -724,7 +874,6 @@ function renderBookCategories() {
     }
 
     if (!bookCategories.length) {
-
         grid.innerHTML = `
             <div class="empty-state">
                 لا توجد أقسام كتب متاحة حاليًا.
@@ -743,32 +892,44 @@ function renderBookCategories() {
         .querySelectorAll(
             "[data-book-category]"
         )
-        .forEach(
-            (button) => {
+        .forEach((button) => {
+            button.addEventListener(
+                "click",
+                () => {
+                    selectedBookCategory =
+                        button.dataset.bookCategory;
 
-                button.addEventListener(
-                    "click",
-                    () => {
+                    updateBookCategorySelection();
+                    renderBooks();
 
-                        selectedBookCategory =
-                            button.dataset.bookCategory;
+                    const sections =
+                        $("#bookSections");
 
-                        renderBooks();
-
-                        const sections =
-                            $("#bookSections");
-
-                        if (sections) {
-
-                            sections.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start"
-                            });
-                        }
+                    if (sections) {
+                        sections.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start"
+                        });
                     }
-                );
-            }
-        );
+                }
+            );
+        });
+
+    updateBookCategorySelection();
+}
+
+function updateBookCategorySelection() {
+    document
+        .querySelectorAll(
+            "[data-book-category]"
+        )
+        .forEach((button) => {
+            button.classList.toggle(
+                "is-selected",
+                button.dataset.bookCategory ===
+                selectedBookCategory
+            );
+        });
 }
 
 /* =========================================================
@@ -776,15 +937,17 @@ function renderBookCategories() {
 ========================================================= */
 
 function bookCard(book) {
-
     const coverUrl =
         getBookCoverUrl(book);
+
+    const pdfUrl =
+        getBookPdfUrl(book);
 
     const hasCover =
         Boolean(coverUrl);
 
     const hasPdf =
-        Boolean(book.pdf_url);
+        Boolean(pdfUrl);
 
     return `
         <article class="book-card">
@@ -813,9 +976,9 @@ function bookCard(book) {
 
             </div>
 
-            <div class="book-content">
+            <div class="book-body">
 
-                <h3>
+                <h3 class="book-title">
                     ${esc(book.title)}
                 </h3>
 
@@ -830,7 +993,7 @@ function bookCard(book) {
 
                 ${book.description
             ? `
-                            <p>
+                            <p class="book-description">
                                 ${esc(book.description)}
                             </p>
                         `
@@ -839,8 +1002,9 @@ function bookCard(book) {
 
                 ${book.pages
             ? `
-                            <div class="book-pages">
-                                ${money(book.pages)} صفحة
+                            <div class="book-meta">
+                                ${money(book.pages)}
+                                صفحة
                             </div>
                         `
             : ""
@@ -851,7 +1015,7 @@ function bookCard(book) {
                     ${hasPdf
             ? `
                                 <button
-                                    class="book-read-btn"
+                                    class="btn btn-primary book-read-btn"
                                     type="button"
                                     data-book-id="${esc(book.id)}"
                                 >
@@ -859,8 +1023,8 @@ function bookCard(book) {
                                 </button>
 
                                 <a
-                                    class="book-download-btn"
-                                    href="${esc(book.pdf_url)}"
+                                    class="btn btn-light book-download-btn"
+                                    href="${esc(pdfUrl)}"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     download
@@ -888,75 +1052,60 @@ function bookCard(book) {
 ========================================================= */
 
 function setupBookCoverFallbacks() {
-
     document
         .querySelectorAll(
             ".book-cover img"
         )
-        .forEach(
-            (img) => {
+        .forEach((img) => {
+            const showFallback =
+                () => {
+                    img.hidden = true;
 
-                const showFallback =
-                    () => {
-
-                        img.hidden = true;
-
-                        const fallback =
-                            img.parentElement?.querySelector(
-                                ".book-cover-fallback"
-                            );
-
-                        if (fallback) {
-                            fallback.hidden = false;
-                        }
-
-                        console.warn(
-                            "Book cover failed to load:",
-                            img.src
+                    const fallback =
+                        img.parentElement?.querySelector(
+                            ".book-cover-fallback"
                         );
-                    };
 
-                const showImage =
-                    () => {
-
-                        img.hidden = false;
-
-                        const fallback =
-                            img.parentElement?.querySelector(
-                                ".book-cover-fallback"
-                            );
-
-                        if (fallback) {
-                            fallback.hidden = true;
-                        }
-                    };
-
-                img.addEventListener(
-                    "error",
-                    showFallback,
-                    { once: true }
-                );
-
-                img.addEventListener(
-                    "load",
-                    showImage
-                );
-
-                /*
-                 * لو الصورة موجودة في Cache.
-                 */
-                if (img.complete) {
-
-                    if (
-                        img.naturalWidth === 0
-                    ) {
-                        showFallback();
-                    } else {
-                        showImage();
+                    if (fallback) {
+                        fallback.hidden = false;
                     }
+                };
+
+            const showImage =
+                () => {
+                    img.hidden = false;
+
+                    const fallback =
+                        img.parentElement?.querySelector(
+                            ".book-cover-fallback"
+                        );
+
+                    if (fallback) {
+                        fallback.hidden = true;
+                    }
+                };
+
+            img.addEventListener(
+                "error",
+                showFallback,
+                { once: true }
+            );
+
+            img.addEventListener(
+                "load",
+                showImage
+            );
+
+            if (img.complete) {
+                if (
+                    img.naturalWidth === 0
+                ) {
+                    showFallback();
+                } else {
+                    showImage();
                 }
             }
-        );
+        });
 }
 
 /* =========================================================
@@ -964,7 +1113,6 @@ function setupBookCoverFallbacks() {
 ========================================================= */
 
 function renderBooks() {
-
     const container =
         $("#bookSections");
 
@@ -976,7 +1124,6 @@ function renderBooks() {
         [...books];
 
     if (selectedBookCategory) {
-
         filteredBooks =
             filteredBooks.filter(
                 (book) =>
@@ -986,10 +1133,15 @@ function renderBooks() {
     }
 
     if (!filteredBooks.length) {
-
         container.innerHTML = `
             <div class="empty-state">
-                لا توجد كتب متاحة حاليًا في هذا القسم.
+                <strong>
+                    لا توجد كتب
+                </strong>
+
+                <p>
+                    لا توجد كتب متاحة حاليًا في هذا القسم.
+                </p>
             </div>
         `;
 
@@ -1000,7 +1152,6 @@ function renderBooks() {
 
     bookCategories.forEach(
         (category) => {
-
             const categoryBooks =
                 filteredBooks.filter(
                     (book) =>
@@ -1015,23 +1166,23 @@ function renderBooks() {
             sections.push(`
                 <section class="book-section">
 
-                    <div class="section-head">
+                    <div class="book-section-heading">
 
                         <div>
 
-                            <span class="eyebrow">
+                            <span class="section-label">
                                 BASMAH E-LIBRARY
                             </span>
 
-                            <h2>
+                            <h3>
                                 ${esc(category.name)}
-                            </h2>
+                            </h3>
 
                         </div>
 
                     </div>
 
-                    <div class="admin-books-grid">
+                    <div class="books-grid">
 
                         ${categoryBooks
                     .map(bookCard)
@@ -1044,6 +1195,49 @@ function renderBooks() {
         }
     );
 
+    const uncategorizedBooks =
+        filteredBooks.filter(
+            (book) =>
+                !book.category_id ||
+                !bookCategories.some(
+                    (category) =>
+                        category.id ===
+                        book.category_id
+                )
+        );
+
+    if (uncategorizedBooks.length) {
+        sections.push(`
+            <section class="book-section">
+
+                <div class="book-section-heading">
+
+                    <div>
+
+                        <span class="section-label">
+                            BASMAH E-LIBRARY
+                        </span>
+
+                        <h3>
+                            كتب أخرى
+                        </h3>
+
+                    </div>
+
+                </div>
+
+                <div class="books-grid">
+
+                    ${uncategorizedBooks
+                .map(bookCard)
+                .join("")}
+
+                </div>
+
+            </section>
+        `);
+    }
+
     container.innerHTML =
         sections.join("");
 
@@ -1053,27 +1247,23 @@ function renderBooks() {
         .querySelectorAll(
             ".book-read-btn"
         )
-        .forEach(
-            (button) => {
+        .forEach((button) => {
+            button.addEventListener(
+                "click",
+                () => {
+                    const book =
+                        books.find(
+                            (item) =>
+                                item.id ===
+                                button.dataset.bookId
+                        );
 
-                button.addEventListener(
-                    "click",
-                    () => {
-
-                        const book =
-                            books.find(
-                                (item) =>
-                                    item.id ===
-                                    button.dataset.bookId
-                            );
-
-                        if (book) {
-                            openBookViewer(book);
-                        }
+                    if (book) {
+                        openBookViewer(book);
                     }
-                );
-            }
-        );
+                }
+            );
+        });
 }
 
 /* =========================================================
@@ -1081,7 +1271,6 @@ function renderBooks() {
 ========================================================= */
 
 function openBookViewer(book) {
-
     const modal =
         $("#bookViewerModal");
 
@@ -1097,11 +1286,14 @@ function openBookViewer(book) {
     const downloadBottom =
         $("#bookDownloadBtnBottom");
 
+    const pdfUrl =
+        getBookPdfUrl(book);
+
     if (
         !modal ||
         !frame ||
         !title ||
-        !book?.pdf_url
+        !pdfUrl
     ) {
         return;
     }
@@ -1110,18 +1302,19 @@ function openBookViewer(book) {
         book.title ||
         "قراءة الكتاب";
 
-    frame.src =
-        book.pdf_url;
+    frame.src = pdfUrl;
 
     if (downloadTop) {
         downloadTop.href =
-            book.pdf_url;
+            pdfUrl;
     }
 
     if (downloadBottom) {
         downloadBottom.href =
-            book.pdf_url;
+            pdfUrl;
     }
+
+    modal.hidden = false;
 
     modal.classList.remove(
         "hidden"
@@ -1138,7 +1331,6 @@ function openBookViewer(book) {
 }
 
 function closeBookViewer() {
-
     const modal =
         $("#bookViewerModal");
 
@@ -1148,6 +1340,8 @@ function closeBookViewer() {
     if (!modal) {
         return;
     }
+
+    modal.hidden = true;
 
     modal.classList.add(
         "hidden"
@@ -1168,7 +1362,6 @@ function closeBookViewer() {
 }
 
 function setupBookViewer() {
-
     const closeButton =
         $("#closeBookViewer");
 
@@ -1178,8 +1371,27 @@ function setupBookViewer() {
     const modal =
         $("#bookViewerModal");
 
-    if (closeButton) {
+    if (modal) {
+        modal.hidden = true;
 
+        modal.classList.add(
+            "hidden"
+        );
+
+        modal.setAttribute(
+            "aria-hidden",
+            "true"
+        );
+
+        const frame =
+            $("#bookViewerFrame");
+
+        if (frame) {
+            frame.src = "";
+        }
+    }
+
+    if (closeButton) {
         closeButton.addEventListener(
             "click",
             closeBookViewer
@@ -1187,7 +1399,6 @@ function setupBookViewer() {
     }
 
     if (closeBottom) {
-
         closeBottom.addEventListener(
             "click",
             closeBookViewer
@@ -1195,11 +1406,9 @@ function setupBookViewer() {
     }
 
     if (modal) {
-
         modal.addEventListener(
             "click",
             (event) => {
-
                 if (
                     event.target === modal
                 ) {
@@ -1212,8 +1421,9 @@ function setupBookViewer() {
     document.addEventListener(
         "keydown",
         (event) => {
-
-            if (event.key === "Escape") {
+            if (
+                event.key === "Escape"
+            ) {
                 closeBookViewer();
             }
         }
@@ -1221,11 +1431,40 @@ function setupBookViewer() {
 }
 
 /* =========================================================
-   SEARCH
+   SEARCH / FILTER
 ========================================================= */
 
-function setupSearch() {
+function updateFilterState() {
+    const clearButton =
+        $("#clearFilter");
 
+    if (!clearButton) {
+        return;
+    }
+
+    const searchInput =
+        $("#searchInput");
+
+    const hasSearch =
+        Boolean(
+            searchInput?.value.trim()
+        );
+
+    const hasCategory =
+        Boolean(selectedCategory);
+
+    clearButton.disabled =
+        !hasSearch &&
+        !hasCategory;
+
+    clearButton.classList.toggle(
+        "is-disabled",
+        !hasSearch &&
+        !hasCategory
+    );
+}
+
+function setupSearch() {
     const searchInput =
         $("#searchInput");
 
@@ -1233,6 +1472,9 @@ function setupSearch() {
         $("#clearFilter");
 
     if (searchInput) {
+        searchInput.classList.add(
+            "search"
+        );
 
         searchInput.addEventListener(
             "input",
@@ -1243,21 +1485,133 @@ function setupSearch() {
     }
 
     if (clearButton) {
-
         clearButton.addEventListener(
             "click",
             () => {
-
-                selectedCategory = null;
+                selectedCategory =
+                    null;
 
                 if (searchInput) {
                     searchInput.value = "";
                 }
 
+                updateCategorySelection();
                 renderProducts();
             }
         );
     }
+
+    updateFilterState();
+}
+
+/* =========================================================
+   MOBILE MENU
+========================================================= */
+
+function setupMobileMenu() {
+    const menuButton =
+        $(".mobile-menu-btn");
+
+    const nav =
+        $(".main-nav");
+
+    if (
+        !menuButton ||
+        !nav
+    ) {
+        return;
+    }
+
+    menuButton.setAttribute(
+        "aria-expanded",
+        "false"
+    );
+
+    menuButton.addEventListener(
+        "click",
+        () => {
+            const isOpen =
+                nav.classList.toggle(
+                    "is-open"
+                );
+
+            menuButton.setAttribute(
+                "aria-expanded",
+                String(isOpen)
+            );
+
+            menuButton.classList.toggle(
+                "is-open",
+                isOpen
+            );
+        }
+    );
+
+    nav
+        .querySelectorAll("a")
+        .forEach((link) => {
+            link.addEventListener(
+                "click",
+                () => {
+                    nav.classList.remove(
+                        "is-open"
+                    );
+
+                    menuButton.classList.remove(
+                        "is-open"
+                    );
+
+                    menuButton.setAttribute(
+                        "aria-expanded",
+                        "false"
+                    );
+                }
+            );
+        });
+}
+
+/* =========================================================
+   SMOOTH NAVIGATION
+========================================================= */
+
+function setupNavigation() {
+    document
+        .querySelectorAll(
+            'a[href^="#"]'
+        )
+        .forEach((link) => {
+            link.addEventListener(
+                "click",
+                (event) => {
+                    const targetId =
+                        link
+                            .getAttribute(
+                                "href"
+                            )
+                            ?.slice(1);
+
+                    if (!targetId) {
+                        return;
+                    }
+
+                    const target =
+                        document.getElementById(
+                            targetId
+                        );
+
+                    if (!target) {
+                        return;
+                    }
+
+                    event.preventDefault();
+
+                    target.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start"
+                    });
+                }
+            );
+        });
 }
 
 /* =========================================================
@@ -1265,7 +1619,6 @@ function setupSearch() {
 ========================================================= */
 
 async function loadData() {
-
     const [
         categoriesResult,
         productsResult,
@@ -1273,7 +1626,6 @@ async function loadData() {
         bookCategoriesResult,
         booksResult
     ] = await Promise.all([
-
         supabase
             .from("categories")
             .select(
@@ -1345,16 +1697,13 @@ async function loadData() {
     ===================================================== */
 
     if (categoriesResult.error) {
-
         console.error(
             "Categories error:",
             categoriesResult.error
         );
 
         categories = [];
-
     } else {
-
         categories =
             categoriesResult.data || [];
     }
@@ -1364,16 +1713,13 @@ async function loadData() {
     ===================================================== */
 
     if (productsResult.error) {
-
         console.error(
             "Products error:",
             productsResult.error
         );
 
         products = [];
-
     } else {
-
         products =
             productsResult.data || [];
     }
@@ -1383,16 +1729,13 @@ async function loadData() {
     ===================================================== */
 
     if (newsResult.error) {
-
         console.error(
             "News ticker error:",
             newsResult.error
         );
 
         newsItems = [];
-
     } else {
-
         newsItems =
             newsResult.data || [];
     }
@@ -1402,16 +1745,13 @@ async function loadData() {
     ===================================================== */
 
     if (bookCategoriesResult.error) {
-
         console.error(
             "Book categories error:",
             bookCategoriesResult.error
         );
 
         bookCategories = [];
-
     } else {
-
         bookCategories =
             bookCategoriesResult.data || [];
     }
@@ -1421,16 +1761,13 @@ async function loadData() {
     ===================================================== */
 
     if (booksResult.error) {
-
         console.error(
             "Books error:",
             booksResult.error
         );
 
         books = [];
-
     } else {
-
         books =
             booksResult.data || [];
     }
@@ -1455,28 +1792,6 @@ async function loadData() {
         }
     );
 
-    /*
-     * Debug خاص بأغلفة الكتب.
-     */
-    books
-        .filter(
-            (book) =>
-                book.cover_url
-        )
-        .forEach(
-            (book) => {
-
-                console.log(
-                    "Book cover:",
-                    book.title,
-                    "Original:",
-                    book.cover_url,
-                    "Resolved:",
-                    getBookCoverUrl(book)
-                );
-            }
-        );
-
     renderNews();
     renderCategories();
     renderProducts();
@@ -1492,19 +1807,30 @@ document.addEventListener(
     "DOMContentLoaded",
     async () => {
 
-        setupSearch();
         setupBookViewer();
 
+        setupSearch();
+        setupMobileMenu();
+        setupNavigation();
+
         try {
-
             await loadData();
-
         } catch (error) {
-
             console.error(
                 "Basmah Library initialization error:",
                 error
             );
+
+            /*
+             * في حالة فشل الاتصال بقاعدة البيانات،
+             * لا نترك المستخدم أمام صفحة فارغة.
+             */
+            const newsTicker =
+                $("#newsTicker");
+
+            if (newsTicker) {
+                renderNews();
+            }
         }
     }
 );

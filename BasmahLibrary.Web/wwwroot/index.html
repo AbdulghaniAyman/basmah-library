@@ -8,12 +8,12 @@
           content="width=device-width, initial-scale=1">
 
     <meta name="description"
-          content="مكتبة بصمة — أدوات مكتبية، طباعة، مطبوعات، هدايا وكتب إلكترونية.">
+          content="مكتبة بصمة — طباعة، أدوات مكتبية، هدايا، منتجات مناسبات وكتب إلكترونية.">
 
     <meta name="theme-color"
           content="#171126">
 
-    <title>مكتبة بصمة | أدوات مكتبية • طباعة • هدايا • كتب</title>
+    <title>مكتبة بصمة | طباعة • أدوات مكتبية • هدايا • كتب</title>
 
     <link rel="icon"
           href="assets/images/branding/logo.png">
@@ -25,22 +25,23 @@
 
 <body>
 
-
-    <!-- =====================================================
+    <!-- =========================
          TOP BAR
-    ====================================================== -->
+    ========================== -->
 
     <div class="topbar">
 
         <div class="container topbar-inner">
 
-            <span>
+            <div class="topbar-message">
+                <span class="topbar-dot"></span>
                 مكتبة بصمة — كل تفصيلة بتفرق
-            </span>
+            </div>
 
             <a href="https://wa.me/201020867958"
                target="_blank"
-               rel="noopener noreferrer">
+               rel="noopener noreferrer"
+               class="topbar-link">
 
                 تواصل معنا على واتساب
 
@@ -51,30 +52,29 @@
     </div>
 
 
-    <!-- =====================================================
+    <!-- =========================
          NEWS TICKER
-    ====================================================== -->
+    ========================== -->
 
     <div id="newsTicker"
          class="basmah-news-ticker"
          dir="rtl"
-         style="display: none;">
+         hidden>
 
-        <div class="basmah-news-label">
+        <div class="news-label">
 
-            <span class="news-dot"></span>
+            <span class="news-live-dot"></span>
 
-            <span>
+            <strong>
                 آخر الأخبار
-            </span>
+            </strong>
 
         </div>
 
-
-        <div class="basmah-news-track">
+        <div class="news-track">
 
             <div id="newsTickerContent"
-                 class="basmah-news-content">
+                 class="news-content">
             </div>
 
         </div>
@@ -82,38 +82,42 @@
     </div>
 
 
-    <!-- =====================================================
+    <!-- =========================
          HEADER
-    ====================================================== -->
+    ========================== -->
 
     <header class="site-header">
 
         <div class="container header-inner">
 
-
-            <a class="brand"
-               href="#top"
+            <a href="#top"
+               class="brand"
                aria-label="مكتبة بصمة">
 
-                <img src="assets/images/branding/logo.png"
-                     alt="شعار مكتبة بصمة">
+                <div class="brand-logo-wrap">
 
-                <span class="brand-copy">
+                    <img src="assets/images/branding/logo.png"
+                         alt="شعار مكتبة بصمة">
+
+                </div>
+
+                <div class="brand-copy">
 
                     <strong>
                         مكتبة بصمة
                     </strong>
 
-                    <small>
+                    <span>
                         كل تفصيلة بتفرق
-                    </small>
+                    </span>
 
-                </span>
+                </div>
 
             </a>
 
 
-            <nav aria-label="التنقل الرئيسي">
+            <nav class="main-nav"
+                 aria-label="القائمة الرئيسية">
 
                 <a href="#categories">
                     الأقسام
@@ -134,42 +138,70 @@
             </nav>
 
 
-            <a class="whatsapp-btn"
-               href="https://wa.me/201020867958?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20%D9%85%D9%83%D8%AA%D8%A8%D8%A9%20%D8%A8%D8%B5%D9%85%D8%A9%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20%D8%A7%D9%84%D9%85%D9%86%D8%AA%D8%AC%D8%A7%D8%AA"
-               target="_blank"
-               rel="noopener noreferrer">
+            <div class="header-actions">
 
-                واتساب
+                <a href="https://wa.me/201020867958"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="header-whatsapp">
 
-            </a>
+                    <span class="button-icon">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20.5 3.5A11.8 11.8 0 0 0 12.1 0C5.6 0 .4 5.2.4 11.7c0 2.1.6 4.1 1.6 5.9L.3 24l6.6-1.7a11.7 11.7 0 0 0 5.2 1.2h.1c6.4 0 11.6-5.2 11.6-11.7 0-3.1-1.2-6.1-3.3-8.3ZM12.1 21.4c-1.7 0-3.4-.5-4.8-1.4l-.3-.2-3.9 1 1-3.8-.2-.3a9.7 9.7 0 0 1-1.5-5.2c0-5.4 4.4-9.8 9.8-9.8 2.6 0 5.1 1 7 2.9 1.9 1.9 2.9 4.4 2.9 7 0 5.4-4.4 9.8-9.9 9.8Zm5.4-7.3c-.3-.2-1.8-.9-2.1-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.3-.5-2.5-1.6-.9-.8-1.6-1.8-1.8-2.1-.2-.3 0-.5.1-.6l.5-.6c.2-.2.2-.3.3-.5.1-.2 0-.4 0-.6-.1-.2-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.8s1.2 3.3 1.4 3.5c.2.2 2.3 3.5 5.6 4.9.8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 1.8-.7 2-1.4.3-.7.3-1.3.2-1.4-.1-.2-.3-.3-.6-.4Z" />
+                        </svg>
+                    </span>
+
+                    <span>
+                        واتساب
+                    </span>
+
+                </a>
+
+                <button class="mobile-menu-btn"
+                        type="button"
+                        aria-label="فتح القائمة"
+                        aria-expanded="false">
+
+                    <span></span>
+                    <span></span>
+                    <span></span>
+
+                </button>
+
+            </div>
 
         </div>
 
     </header>
 
 
-    <!-- =====================================================
+    <!-- =========================
          MAIN
-    ====================================================== -->
+    ========================== -->
 
     <main id="top">
 
 
-        <!-- =================================================
+        <!-- =========================
              HERO
-        ================================================== -->
+        ========================== -->
 
-        <section class="hero">
+        <section class="hero-section">
+
+            <div class="hero-decoration hero-decoration-one"></div>
+            <div class="hero-decoration hero-decoration-two"></div>
 
             <div class="container hero-grid">
 
+                <div class="hero-content">
 
-                <div class="hero-copy">
+                    <div class="hero-badge">
 
+                        <span class="hero-badge-dot"></span>
 
-                    <span class="eyebrow">
-                        BASMAH • STATIONERY • PRINT • GIFTS
-                    </span>
+                        مكتبة • طباعة • هدايا • تخصيص
+
+                    </div>
 
 
                     <h1>
@@ -183,177 +215,270 @@
                     </h1>
 
 
-                    <p class="hero-lead">
+                    <p class="hero-description">
 
-                        أدوات مكتبية، طباعة ومطبوعات،
-                        هدايا وتفاصيل مخصصة — كل اللي تحتاجه
-                        في مكان واحد، وبلمسة <b>بصمة</b>.
+                        كل اللي تحتاجه من أدوات مكتبية،
+                        طباعة ومطبوعات، إستيكرات، هدايا
+                        ومنتجات مناسبات — في مكان واحد
+                        وبلمسة بصمة.
 
                     </p>
 
 
-                    <div class="hero-actions">
+                    <div class="hero-buttons">
 
+                        <a href="#categories"
+                           class="btn btn-primary btn-large">
 
-                        <a class="primary-btn"
-                           href="#categories">
+                            <span>
+                                استكشف الأقسام
+                            </span>
 
-                            استكشف الأقسام
+                            <span class="btn-arrow">
+                                ←
+                            </span>
 
                         </a>
 
 
-                        <a class="outline-btn"
-                           href="https://wa.me/201020867958?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20%D9%85%D9%83%D8%AA%D8%A8%D8%A9%20%D8%A8%D8%B5%D9%85%D8%A9%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20%D8%A7%D9%84%D9%85%D9%86%D8%AA%D8%AC%D8%A7%D8%AA"
+                        <a href="https://wa.me/201020867958?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20%D9%85%D9%83%D8%AA%D8%A8%D8%A9%20%D8%A8%D8%B5%D9%85%D8%A9"
                            target="_blank"
-                           rel="noopener noreferrer">
+                           rel="noopener noreferrer"
+                           class="btn btn-light btn-large">
 
-                            تواصل واتساب
+                            <span>
+                                تواصل معنا
+                            </span>
+
+                            <span>
+                                واتساب
+                            </span>
 
                         </a>
 
                     </div>
 
 
-                    <div class="hero-points">
+                    <div class="hero-features">
 
+                        <div class="hero-feature">
 
-                        <span>
-
-                            <i>
+                            <span class="feature-check">
                                 ✓
-                            </i>
+                            </span>
 
-                            أدوات مكتبية
+                            <span>
+                                طباعة وتخصيص
+                            </span>
 
-                        </span>
+                        </div>
 
 
-                        <span>
+                        <div class="hero-feature">
 
-                            <i>
+                            <span class="feature-check">
                                 ✓
-                            </i>
+                            </span>
 
-                            طباعة وتخصيص
+                            <span>
+                                هدايا ومناسبات
+                            </span>
 
-                        </span>
+                        </div>
 
 
-                        <span>
+                        <div class="hero-feature">
 
-                            <i>
+                            <span class="feature-check">
                                 ✓
-                            </i>
+                            </span>
 
-                            هدايا ومناسبات
+                            <span>
+                                أدوات مكتبية
+                            </span>
 
-                        </span>
-
+                        </div>
 
                     </div>
 
                 </div>
 
 
-                <!-- =================================================
-                     HERO VISUAL
-                ================================================== -->
+                <!-- HERO SHOWCASE -->
 
-                <div class="hero-showcase"
-                     aria-label="خدمات مكتبة بصمة">
+                <div class="hero-showcase">
 
+                    <div class="showcase-glow"></div>
 
-                    <div class="showcase-orbit orbit-one"></div>
-
-                    <div class="showcase-orbit orbit-two"></div>
+                    <div class="showcase-ring ring-one"></div>
+                    <div class="showcase-ring ring-two"></div>
+                    <div class="showcase-ring ring-three"></div>
 
 
-                    <div class="product-tile tile-print">
+                    <div class="showcase-main-card">
 
-                        <div class="tile-icon">
+                        <div class="showcase-logo">
+
+                            <img src="assets/images/branding/logo.png"
+                                 alt="مكتبة بصمة">
+
+                        </div>
+
+                        <span>
+                            BASMAH
+                        </span>
+
+                        <strong>
+                            كل تفصيلة
+                            <br>
+                            بتفرق
+                        </strong>
+
+                    </div>
+
+
+                    <div class="showcase-card showcase-print">
+
+                        <div class="showcase-icon">
                             ✦
                         </div>
 
-                        <span>
+                        <small>
                             PRINT
-                        </span>
+                        </small>
 
                         <strong>
-
                             طباعة
                             <br>
                             ومطبوعات
-
                         </strong>
-
-                        <small>
-                            استيكرات • كروت • ورقيات
-                        </small>
 
                     </div>
 
 
-                    <div class="product-tile tile-office">
+                    <div class="showcase-card showcase-office">
 
-                        <div class="tile-icon">
+                        <div class="showcase-icon">
                             ▤
                         </div>
 
-                        <span>
+                        <small>
                             OFFICE
-                        </span>
+                        </small>
 
                         <strong>
-
                             أدوات
                             <br>
                             مكتبية
-
                         </strong>
-
-                        <small>
-                            كل احتياجاتك اليومية
-                        </small>
 
                     </div>
 
 
-                    <div class="product-tile tile-gifts">
+                    <div class="showcase-card showcase-gifts">
 
-                        <div class="tile-icon">
+                        <div class="showcase-icon">
                             ♡
                         </div>
 
-                        <span>
+                        <small>
                             GIFTS
-                        </span>
+                        </small>
 
                         <strong>
-
                             هدايا
                             <br>
                             بتفاصيلك
-
                         </strong>
 
-                        <small>
-                            مناسبات • تخرج • بيبي
-                        </small>
-
                     </div>
 
+                </div>
 
-                    <div class="showcase-label">
+            </div>
 
-                        <b>
-                            بصمة
-                        </b>
+        </section>
+
+
+        <!-- =========================
+             SERVICES STRIP
+        ========================== -->
+
+        <section class="services-strip">
+
+            <div class="container services-grid">
+
+                <div class="service-item">
+
+                    <div class="service-icon">
+                        ✦
+                    </div>
+
+                    <div>
+                        <strong>
+                            طباعة احترافية
+                        </strong>
 
                         <span>
-                            كل تفصيلة بتفرق
+                            ورقيات ومطبوعات
                         </span>
+                    </div>
 
+                </div>
+
+
+                <div class="service-item">
+
+                    <div class="service-icon">
+                        ◇
+                    </div>
+
+                    <div>
+                        <strong>
+                            تصميم وتخصيص
+                        </strong>
+
+                        <span>
+                            تفاصيل على ذوقك
+                        </span>
+                    </div>
+
+                </div>
+
+
+                <div class="service-item">
+
+                    <div class="service-icon">
+                        ♡
+                    </div>
+
+                    <div>
+                        <strong>
+                            هدايا ومناسبات
+                        </strong>
+
+                        <span>
+                            لكل مناسبة
+                        </span>
+                    </div>
+
+                </div>
+
+
+                <div class="service-item">
+
+                    <div class="service-icon">
+                        ✓
+                    </div>
+
+                    <div>
+                        <strong>
+                            اطلب بسهولة
+                        </strong>
+
+                        <span>
+                            مباشرة عبر واتساب
+                        </span>
                     </div>
 
                 </div>
@@ -363,76 +488,21 @@
         </section>
 
 
-        <!-- =================================================
-             PROMISE STRIP
-        ================================================== -->
-
-        <section class="promise-strip">
-
-            <div class="container promise-grid">
-
-
-                <div>
-
-                    <b>
-                        طباعة
-                    </b>
-
-                    <span>
-                        من الورقة للتفصيلة
-                    </span>
-
-                </div>
-
-
-                <div>
-
-                    <b>
-                        تخصيص
-                    </b>
-
-                    <span>
-                        تصميم على ذوقك
-                    </span>
-
-                </div>
-
-
-                <div>
-
-                    <b>
-                        هدايا
-                    </b>
-
-                    <span>
-                        لكل مناسبة وتفصيلة
-                    </span>
-
-                </div>
-
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
+        <!-- =========================
              CATEGORIES
-        ================================================== -->
+        ========================== -->
 
         <section class="section categories-section"
                  id="categories">
 
             <div class="container">
 
-
-                <div class="section-head">
-
+                <div class="section-heading">
 
                     <div>
 
-                        <span class="eyebrow">
-                            OUR CATEGORIES
+                        <span class="section-label">
+                            الأقسام
                         </span>
 
                         <h2>
@@ -441,13 +511,9 @@
 
                     </div>
 
-
                     <p>
-
-                        من الطباعة والإستيكرات لحد الهدايا
-                        ومنتجات المناسبات — تصفح الأقسام
-                        وشوف المنتجات المتاحة.
-
+                        تصفح أقسام مكتبة بصمة واختار
+                        الخدمة أو المنتج المناسب لك.
                     </p>
 
                 </div>
@@ -456,10 +522,8 @@
                 <div id="categoryGrid"
                      class="category-grid">
 
-                    <div class="empty-state">
-
+                    <div class="loading-card">
                         جاري تحميل الأقسام...
-
                     </div>
 
                 </div>
@@ -469,48 +533,57 @@
         </section>
 
 
-        <!-- =================================================
+        <!-- =========================
              CATALOG
-        ================================================== -->
+        ========================== -->
 
         <section class="section catalog-section"
                  id="catalog">
 
             <div class="container">
 
+                <div class="catalog-toolbar">
 
-                <div class="section-head catalog-head">
+                    <div class="catalog-title">
 
-
-                    <div>
-
-                        <span class="eyebrow">
-                            BASMAH CATALOG
+                        <span class="section-label">
+                            الكتالوج
                         </span>
 
                         <h2>
-                            منتجاتنا
+                            منتجات مكتبة بصمة
                         </h2>
+
+                        <p>
+                            اختار المنتج المناسب وشوف السعر
+                            واطلبه مباشرة عبر واتساب.
+                        </p>
 
                     </div>
 
 
-                    <div class="filters">
+                    <div class="catalog-tools">
 
+                        <div class="search-box">
 
-                        <input id="searchInput"
-                               class="search"
-                               type="search"
-                               placeholder="ابحث عن منتج..."
-                               autocomplete="off"
-                               aria-label="البحث عن منتج">
+                            <span class="search-icon">
+                                ⌕
+                            </span>
+
+                            <input id="searchInput"
+                                   type="search"
+                                   placeholder="ابحث عن منتج..."
+                                   autocomplete="off"
+                                   aria-label="البحث عن منتج">
+
+                        </div>
 
 
                         <button id="clearFilter"
-                                class="outline-btn"
+                                class="filter-clear"
                                 type="button">
 
-                            مسح
+                            مسح البحث
 
                         </button>
 
@@ -522,10 +595,8 @@
                 <div id="productSections"
                      class="product-sections">
 
-                    <div class="empty-state">
-
+                    <div class="loading-card">
                         جاري تحميل المنتجات...
-
                     </div>
 
                 </div>
@@ -535,23 +606,21 @@
         </section>
 
 
-        <!-- =================================================
-             ELECTRONIC LIBRARY
-        ================================================== -->
+        <!-- =========================
+             E-LIBRARY
+        ========================== -->
 
         <section class="section books-section"
                  id="books">
 
             <div class="container">
 
-
-                <div class="section-head">
-
+                <div class="section-heading">
 
                     <div>
 
-                        <span class="eyebrow">
-                            BASMAH E-LIBRARY
+                        <span class="section-label">
+                            المكتبة الإلكترونية
                         </span>
 
                         <h2>
@@ -560,137 +629,237 @@
 
                     </div>
 
-
                     <p>
-
-                        تصفح الكتب المتاحة،
-                        واقرأ الكتاب مباشرة من الموقع
-                        أو حمّله بصيغة PDF.
-
+                        تصفح الكتب المتاحة واقرأ الكتاب
+                        مباشرة أو حمّله بصيغة PDF.
                     </p>
 
                 </div>
 
 
-                <!-- =================================================
-                     BOOK CATEGORIES
-                ================================================== -->
-
                 <div id="bookCategoriesGrid"
                      class="book-categories-grid">
 
-                    <div class="empty-state">
-
+                    <div class="loading-card">
                         جاري تحميل أقسام الكتب...
-
                     </div>
 
                 </div>
 
-
-                <!-- =================================================
-                     BOOKS
-                ================================================== -->
 
                 <div id="bookSections"
                      class="book-sections">
 
-                    <div class="empty-state">
-
+                    <div class="loading-card">
                         جاري تحميل الكتب...
-
                     </div>
 
                 </div>
-
 
             </div>
 
         </section>
 
 
-        <!-- =================================================
-             PDF BOOK VIEWER
-        ================================================== -->
+        <!-- =========================
+             CTA
+        ========================== -->
 
-        <div id="bookViewerModal"
-             class="book-viewer-modal hidden"
-             aria-hidden="true">
+        <section class="cta-section"
+                 id="contact">
 
+            <div class="container">
 
-            <div class="book-viewer-card">
+                <div class="cta-card">
 
+                    <div class="cta-content">
 
-                <!-- Viewer Header -->
-
-                <div class="book-viewer-header">
-
-
-                    <div>
-
-                        <span class="eyebrow">
-                            BASMAH E-LIBRARY
+                        <span class="section-label">
+                            محتاج حاجة مخصوص؟
                         </span>
 
-                        <strong id="bookViewerTitle">
-                            قراءة الكتاب
-                        </strong>
+                        <h2>
+                            عندك فكرة وعايز تنفذها؟
+                        </h2>
+
+                        <p>
+                            ابعتلنا فكرتك أو المنتج اللي
+                            محتاجه، ونتواصل معاك على واتساب.
+                        </p>
 
                     </div>
 
 
-                    <div class="book-viewer-actions">
+                    <a href="https://wa.me/201020867958?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20%D9%85%D9%83%D8%AA%D8%A8%D8%A9%20%D8%A8%D8%B5%D9%85%D8%A9%20%D8%B9%D9%86%D8%AF%D9%8A%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="btn btn-gold btn-large">
+
+                        <span>
+                            كلمنا على واتساب
+                        </span>
+
+                        <span>
+                            ←
+                        </span>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
 
 
-                        <a id="bookDownloadBtn"
-                           class="book-viewer-download"
-                           href="#"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           download>
+    <!-- =========================
+         FOOTER
+    ========================== -->
 
-                            تحميل PDF
+    <footer class="site-footer">
 
-                        </a>
+        <div class="container footer-grid">
+
+            <div class="footer-brand">
+
+                <div class="footer-logo">
+
+                    <img src="assets/images/branding/logo.png"
+                         alt="مكتبة بصمة">
+
+                </div>
+
+                <div>
+
+                    <strong>
+                        مكتبة بصمة
+                    </strong>
+
+                    <p>
+                        كل تفصيلة بتفرق.
+                    </p>
+
+                </div>
+
+            </div>
 
 
-                        <button id="closeBookViewer"
-                                class="book-viewer-close"
-                                type="button"
-                                aria-label="إغلاق">
+            <div class="footer-column">
 
-                            ×
+                <h3>
+                    روابط سريعة
+                </h3>
 
-                        </button>
+                <a href="#categories">
+                    الأقسام
+                </a>
+
+                <a href="#catalog">
+                    المنتجات
+                </a>
+
+                <a href="#books">
+                    الكتب
+                </a>
+
+                <a href="#contact">
+                    تواصل معنا
+                </a>
+
+            </div>
 
 
-                    </div>
+            <div class="footer-column">
+
+                <h3>
+                    تواصل معنا
+                </h3>
+
+                <a href="tel:01041498534">
+                    01041498534
+                </a>
+
+                <a href="https://wa.me/201020867958"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                    واتساب: 01020867958
+                </a>
+
+                <a href="https://www.facebook.com/Basmalibrary1"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                    فيسبوك: Basma Library
+                </a>
+
+            </div>
+
+
+            <div class="footer-column footer-address">
+
+                <h3>
+                    العنوان
+                </h3>
+
+                <address>
+                    محور خدمات الحي الثاني،
+                    مول عمر بن الخطاب،
+                    شارع عبدالرحمن بن عوف،
+                    بجوار مطعم أسماك الحوت،
+                    مدينة السادات،
+                    المنوفية، مصر.
+                </address>
+
+            </div>
+
+        </div>
+
+
+        <div class="container footer-bottom">
+
+            <span>
+                © مكتبة بصمة — جميع الحقوق محفوظة
+            </span>
+
+            <a href="admin.html">
+                دخول الإدارة
+            </a>
+
+        </div>
+
+    </footer>
+
+
+    <!-- =========================
+         BOOK VIEWER
+    ========================== -->
+
+    <div id="bookViewerModal"
+         class="book-viewer-modal hidden"
+         aria-hidden="true">
+
+        <div class="book-viewer-card">
+
+            <div class="book-viewer-header">
+
+                <div>
+
+                    <span class="viewer-label">
+                        مكتبة بصمة
+                    </span>
+
+                    <strong id="bookViewerTitle">
+                        قراءة الكتاب
+                    </strong>
 
                 </div>
 
 
-                <!-- PDF -->
+                <div class="book-viewer-header-actions">
 
-                <div class="book-viewer-body">
-
-
-                    <iframe id="bookViewerFrame"
-                            title="قارئ الكتاب"
-                            loading="lazy"
-                            allow="fullscreen">
-                    </iframe>
-
-
-                </div>
-
-
-                <!-- Mobile / Bottom Close -->
-
-                <div class="book-viewer-actions book-viewer-bottom-actions">
-
-
-                    <a id="bookDownloadBtnBottom"
-                       class="book-viewer-download"
+                    <a id="bookDownloadBtn"
+                       class="viewer-download"
                        href="#"
                        target="_blank"
                        rel="noopener noreferrer"
@@ -700,165 +869,62 @@
 
                     </a>
 
+                    <button id="closeBookViewer"
+                            class="viewer-close"
+                            type="button"
+                            aria-label="إغلاق">
 
-                    <button id="bookViewerCloseBtn"
-                            class="outline-btn"
-                            type="button">
-
-                        إغلاق
+                        ×
 
                     </button>
 
-
                 </div>
 
+            </div>
+
+
+            <div class="book-viewer-body">
+
+                <iframe id="bookViewerFrame"
+                        title="قارئ الكتاب"
+                        loading="lazy"
+                        allow="fullscreen">
+                </iframe>
+
+            </div>
+
+
+            <div class="book-viewer-footer">
+
+                <a id="bookDownloadBtnBottom"
+                   class="btn btn-gold"
+                   href="#"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   download>
+
+                    تحميل PDF
+
+                </a>
+
+                <button id="bookViewerCloseBtn"
+                        class="btn btn-light"
+                        type="button">
+
+                    إغلاق
+
+                </button>
 
             </div>
 
         </div>
 
+    </div>
 
-        <!-- =================================================
-             CTA
-        ================================================== -->
-
-        <section class="cta-section"
-                 id="contact">
-
-            <div class="container cta-inner">
-
-
-                <div>
-
-                    <span class="eyebrow">
-                        HAVE A QUESTION?
-                    </span>
-
-                    <h2>
-                        محتاج حاجة مخصوص؟
-                    </h2>
-
-                    <p>
-
-                        ابعتلنا فكرتك على واتساب،
-                        ونشوف معاك أنسب تفاصيل وتنفيذ.
-
-                    </p>
-
-                </div>
-
-
-                <a class="primary-btn"
-                   href="https://wa.me/201020867958?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20%D9%85%D9%83%D8%AA%D8%A8%D8%A9%20%D8%A8%D8%B5%D9%85%D8%A9%20%D8%B9%D9%86%D8%AF%D9%8A%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1"
-                   target="_blank"
-                   rel="noopener noreferrer">
-
-                    كلمنا على واتساب
-
-                </a>
-
-            </div>
-
-        </section>
-
-
-    </main>
-
-
-    <!-- =====================================================
-         FOOTER
-    ====================================================== -->
-
-    <footer>
-
-        <div class="container footer-grid">
-
-
-            <div class="footer-brand">
-
-                <img src="assets/images/branding/logo.png"
-                     alt="مكتبة بصمة">
-
-
-                <div>
-
-                    <strong>
-                        مكتبة بصمة
-                    </strong>
-
-                    <p>
-                        كل تفصيلة بتفرق
-                    </p>
-
-                </div>
-
-            </div>
-
-
-            <div class="footer-contact">
-
-                <span>
-                    تفاصيل التواصل
-                </span>
-
-
-                <a href="tel:01041498534">
-                    📞 01041498534
-                </a>
-
-
-                <a href="https://wa.me/201020867958"
-                   target="_blank"
-                   rel="noopener noreferrer">
-
-                    واتساب: 01020867958
-
-                </a>
-
-
-                <a href="https://www.facebook.com/Basmalibrary1"
-                   target="_blank"
-                   rel="noopener noreferrer">
-
-                    فيسبوك: Basma Library
-
-                </a>
-
-
-                <address>
-
-                    محور خدمات الحي الثاني،
-                    مول عمر بن الخطاب،
-                    شارع عبدالرحمن بن عوف،
-                    بجوار مطعم أسماك الحوت،
-                    مدينة السادات، المنوفية، مصر، 32958
-
-                </address>
-
-            </div>
-
-
-            <a class="admin-link"
-               href="admin.html">
-
-                دخول الإدارة
-
-            </a>
-
-
-        </div>
-
-    </footer>
-
-
-    <!-- =====================================================
-         APP
-    ====================================================== -->
 
     <script type="module"
             src="assets/js/app.js">
     </script>
-
 
 </body>
 

@@ -1,2713 +1,2442 @@
-import {
-    createClient
-} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import {
     SUPABASE_URL,
     SUPABASE_ANON_KEY
 } from "./config.js";
-
-
-/* =====================================================
-   SUPABASE
-===================================================== */
 
 const supabase = createClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY
 );
 
+/* =========================================================
+   SETTINGS
+========================================================= */
 
-/* =====================================================
-   HELPERS
-===================================================== */
+const PRODUCT_BUCKET =
+    "product-images";
 
-const $ = (selector) =>
-    document.querySelector(selector);
+const BOOK_BUCKET =
+    "book-library";
 
+/* =========================================================
+   STATE
+========================================================= */
 
-const esc = (value) =>
-    String(value ?? "").replace(
-        /[&<>"']/g,
-        (char) => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        }[char])
-    );
-
-
-const money = (value) =>
-    Number(value || 0).toLocaleString(
-        "ar-EG",
-        {
-            maximumFractionDigits: 2
-        }
-    );
-
-
-const now = () =>
-    new Date().toISOString();
-
-
-/* =====================================================
-   GLOBAL DATA
-===================================================== */
+let currentUser = null;
 
 let categories = [];
 let products = [];
 
-let newsItems = [];
-let editingNewsId = null;
-
-let editingCategoryId = null;
-let editingProductId = null;
-
-let selectedFile = null;
-
-
-/* =====================================================
-   BOOK LIBRARY DATA
-===================================================== */
-
 let bookCategories = [];
 let books = [];
 
-let editingBookCategoryId = null;
+let newsItems = [];
+
+let editingProductId = null;
+let editingCategoryId = null;
 let editingBookId = null;
+let editingBookCategoryId = null;
+let editingNewsId = null;
 
-let selectedBookCover = null;
-let selectedBookPdf = null;
+/* =========================================================
+   HELPERS
+========================================================= */
 
+const $ = (selector) =>
+    document.querySelector(selector);
 
-/* =====================================================
-   MESSAGE
-===================================================== */
+function esc(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-function msg(selector, text, error = true) {
+function money(value) {
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return "";
+    }
 
-    const element = $(selector);
+    const number = Number(value);
 
-    if (!element) {
+    if (Number.isNaN(number)) {
+        return String(value);
+    }
+
+    return new Intl.NumberFormat(
+        "ar-EG"
+    ).format(number);
+}
+
+function slugify(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(
+            /[\u0600-\u06FF]/g,
+            ""
+        )
+        .replace(
+            /[^a-z0-9]+/g,
+            "-"
+        )
+        .replace(
+            /^-+|-+$/g,
+            "");
+}
+
+function showToast(
+    message,
+    type = ""
+) {
+    const container =
+        $("#toastContainer");
+
+    if (!container) {
         return;
     }
 
-    element.textContent = text || "";
+    const toast =
+        document.createElement("div");
 
-    element.style.color =
+    toast.className =
+        `toast ${type}`;
+
+    toast.textContent =
+        message;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3500);
+}
+
+function setLoading(
+    button,
+    loading,
+    normalText
+) {
+    if (!button) {
+        return;
+    }
+
+    button.disabled =
+        loading;
+
+    button.textContent =
+        loading
+            ? "جاري التنفيذ..."
+            : normalText;
+}
+
+/* =========================================================
+   AUTH
+========================================================= */
+
+async function getCurrentUser() {
+    const {
+        data,
         error
-            ? "#a33"
-            : "#177440";
+    } = await supabase.auth.getUser();
+
+    if (error) {
+        console.error(
+            "Auth error:",
+            error
+        );
+
+        return null;
+    }
+
+    return data?.user || null;
 }
-
-
-/* =====================================================
-   LOGIN SCREEN
-===================================================== */
-
-function showLogin(text = "") {
-
-    $("#adminLogin")
-        ?.classList
-        .remove("hidden");
-
-    $("#adminPanel")
-        ?.classList
-        .add("hidden");
-
-    $("#logoutBtn")
-        ?.classList
-        .add("hidden");
-
-    msg(
-        "#adminLoginMessage",
-        text
-    );
-}
-
-
-/* =====================================================
-   ADMIN SCREEN
-===================================================== */
-
-function showAdmin() {
-
-    $("#adminLogin")
-        ?.classList
-        .add("hidden");
-
-    $("#adminPanel")
-        ?.classList
-        .remove("hidden");
-
-    $("#logoutBtn")
-        ?.classList
-        .remove("hidden");
-}
-
-
-/* =====================================================
-   CHECK ADMIN
-===================================================== */
 
 async function checkAdmin() {
-
-    const {
-        data: {
-            session
-        }
-    } = await supabase.auth.getSession();
-
-
-    if (!session) {
-
-        showLogin();
-
-        return;
+    if (!currentUser) {
+        return false;
     }
 
-
     const {
-        data: profile,
+        data,
         error
     } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role,full_name")
         .eq(
             "id",
-            session.user.id
+            currentUser.id
         )
         .maybeSingle();
 
-
-    if (
-        error ||
-        profile?.role !== "admin"
-    ) {
-
-        await supabase.auth.signOut();
-
-        showLogin(
-            "هذا الحساب غير مصرح له بدخول لوحة الإدارة."
+    if (error) {
+        console.error(
+            "Profile error:",
+            error
         );
 
+        return false;
+    }
+
+    if (
+        data?.role !== "admin"
+    ) {
+        return false;
+    }
+
+    const name =
+        data.full_name ||
+        currentUser.email ||
+        "المدير";
+
+    const userName =
+        $("#adminUserName");
+
+    if (userName) {
+        userName.textContent =
+            name;
+    }
+
+    return true;
+}
+
+async function showAdminApp() {
+    const loginScreen =
+        $("#loginScreen");
+
+    const adminApp =
+        $("#adminApp");
+
+    if (loginScreen) {
+        loginScreen.classList.add(
+            "hidden"
+        );
+    }
+
+    if (adminApp) {
+        adminApp.classList.remove(
+            "hidden"
+        );
+    }
+}
+
+function showLogin() {
+    const loginScreen =
+        $("#loginScreen");
+
+    const adminApp =
+        $("#adminApp");
+
+    if (loginScreen) {
+        loginScreen.classList.remove(
+            "hidden"
+        );
+    }
+
+    if (adminApp) {
+        adminApp.classList.add(
+            "hidden"
+        );
+    }
+}
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+const sectionTitles = {
+    dashboard:
+        "لوحة التحكم",
+
+    products:
+        "المنتجات",
+
+    categories:
+        "أقسام المنتجات",
+
+    books:
+        "المكتبة الإلكترونية",
+
+    bookCategories:
+        "أقسام الكتب",
+
+    news:
+        "الشريط الإخباري"
+};
+
+function switchSection(
+    sectionName
+) {
+    document
+        .querySelectorAll(
+            ".sidebar-link"
+        )
+        .forEach((button) => {
+            button.classList.toggle(
+                "active",
+                button.dataset.section ===
+                sectionName
+            );
+        });
+
+    document
+        .querySelectorAll(
+            ".admin-section"
+        )
+        .forEach((section) => {
+            section.classList.toggle(
+                "active",
+                section.id ===
+                `section-${sectionName}`
+            );
+        });
+
+    const pageTitle =
+        $("#pageTitle");
+
+    if (pageTitle) {
+        pageTitle.textContent =
+            sectionTitles[
+            sectionName
+            ] ||
+            "لوحة التحكم";
+    }
+
+    const sidebar =
+        $("#sidebar");
+
+    if (sidebar) {
+        sidebar.classList.remove(
+            "open"
+        );
+    }
+}
+
+/* =========================================================
+   MODAL
+========================================================= */
+
+function openModal(
+    title,
+    content
+) {
+    const modal =
+        $("#modal");
+
+    const modalTitle =
+        $("#modalTitle");
+
+    const modalBody =
+        $("#modalBody");
+
+    if (
+        !modal ||
+        !modalTitle ||
+        !modalBody
+    ) {
         return;
     }
 
+    modalTitle.textContent =
+        title;
 
-    showAdmin();
+    modalBody.innerHTML =
+        content;
 
-    await loadAll();
+    modal.classList.remove(
+        "hidden"
+    );
 }
 
+function closeModal() {
+    const modal =
+        $("#modal");
 
-/* =====================================================
-   LOAD ALL
-===================================================== */
-
-async function loadAll() {
-
-    const [
-        categoryResult,
-        productResult,
-        newsResult,
-        bookCategoryResult,
-        bookResult
-    ] = await Promise.all([
-
-        /* PRODUCT CATEGORIES */
-
-        supabase
-            .from("categories")
-            .select("*")
-            .order(
-                "sort_order",
-                {
-                    ascending: true
-                }
-            ),
-
-
-        /* PRODUCTS */
-
-        supabase
-            .from("products")
-            .select("*")
-            .order(
-                "sort_order",
-                {
-                    ascending: true
-                }
-            )
-            .order(
-                "created_at",
-                {
-                    ascending: false
-                }
-            ),
-
-
-        /* NEWS */
-
-        supabase
-            .from("news_ticker")
-            .select("*")
-            .order(
-                "sort_order",
-                {
-                    ascending: true
-                }
-            )
-            .order(
-                "created_at",
-                {
-                    ascending: false
-                }
-            ),
-
-
-        /* BOOK CATEGORIES */
-
-        supabase
-            .from("book_categories")
-            .select("*")
-            .order(
-                "sort_order",
-                {
-                    ascending: true
-                }
-            ),
-
-
-        /* BOOKS */
-
-        supabase
-            .from("books")
-            .select("*")
-            .order(
-                "sort_order",
-                {
-                    ascending: true
-                }
-            )
-            .order(
-                "created_at",
-                {
-                    ascending: false
-                }
-            )
-
-    ]);
-
-
-    if (categoryResult.error) {
-
-        console.error(
-            "Categories:",
-            categoryResult.error
+    if (modal) {
+        modal.classList.add(
+            "hidden"
         );
-
     }
 
-
-    if (productResult.error) {
-
-        console.error(
-            "Products:",
-            productResult.error
-        );
-
-    }
-
-
-    if (newsResult.error) {
-
-        console.error(
-            "News:",
-            newsResult.error
-        );
-
-        msg(
-            "#newsMessage",
-            "تعذر تحميل الأخبار: " +
-            newsResult.error.message
-        );
-
-    }
-
-
-    if (bookCategoryResult.error) {
-
-        console.error(
-            "Book Categories:",
-            bookCategoryResult.error
-        );
-
-        msg(
-            "#bookLibraryMessage",
-            "تعذر تحميل أقسام الكتب: " +
-            bookCategoryResult.error.message
-        );
-
-    }
-
-
-    if (bookResult.error) {
-
-        console.error(
-            "Books:",
-            bookResult.error
-        );
-
-        msg(
-            "#bookLibraryMessage",
-            "تعذر تحميل الكتب: " +
-            bookResult.error.message
-        );
-
-    }
-
-
-    categories =
-        categoryResult.data || [];
-
-
-    products =
-        productResult.data || [];
-
-
-    newsItems =
-        newsResult.data || [];
-
-
-    bookCategories =
-        bookCategoryResult.data || [];
-
-
-    books =
-        bookResult.data || [];
-
-
-    renderStats();
-
-    fillCategorySelects();
-
-    renderCategories();
-
-    renderProducts();
-
-    renderNews();
-
-    renderBookStats();
-
-    renderBookCategories();
-
-    fillBookCategorySelect();
-
-    renderBooks();
+    editingProductId = null;
+    editingCategoryId = null;
+    editingBookId = null;
+    editingBookCategoryId = null;
+    editingNewsId = null;
 }
 
+/* =========================================================
+   STORAGE
+========================================================= */
 
-/* =====================================================
-   PRODUCT STATS
-===================================================== */
-
-function renderStats() {
-
-    if ($("#statCategories")) {
-
-        $("#statCategories")
-            .textContent =
-            categories.filter(
-                c => c.active
-            ).length;
-
+async function uploadFile(
+    bucket,
+    file,
+    folder
+) {
+    if (!file) {
+        return null;
     }
 
+    const extension =
+        file.name.includes(".")
+            ? file.name
+                .split(".")
+                .pop()
+                .toLowerCase()
+            : "";
 
-    if ($("#statProducts")) {
+    const safeName =
+        `${crypto.randomUUID()}${extension
+            ? `.${extension}`
+            : ""
+        }`;
 
-        $("#statProducts")
-            .textContent =
-            products.length;
+    const path =
+        `${folder}/${safeName}`;
 
+    const {
+        error
+    } = await supabase.storage
+        .from(bucket)
+        .upload(
+            path,
+            file,
+            {
+                cacheControl:
+                    "3600",
+                upsert: false
+            }
+        );
+
+    if (error) {
+        throw error;
     }
 
+    const {
+        data
+    } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(path);
 
-    if ($("#statActive")) {
-
-        $("#statActive")
-            .textContent =
-            products.filter(
-                p => p.active
-            ).length;
-
-    }
+    return {
+        path,
+        url:
+            data?.publicUrl ||
+            ""
+    };
 }
 
+/* =========================================================
+   DASHBOARD
+========================================================= */
 
-/* =====================================================
-   BOOK STATS
-===================================================== */
-
-function renderBookStats() {
+function updateDashboard() {
+    const statProducts =
+        $("#statProducts");
 
     const statCategories =
-        $("#statBookCategories");
+        $("#statCategories");
 
     const statBooks =
         $("#statBooks");
 
-    const statActiveBooks =
-        $("#statActiveBooks");
+    const statNews =
+        $("#statNews");
 
+    if (statProducts) {
+        statProducts.textContent =
+            products.filter(
+                (item) =>
+                    item.active
+            ).length;
+    }
 
     if (statCategories) {
-
         statCategories.textContent =
-            bookCategories.filter(
-                category =>
-                    category.active
+            categories.filter(
+                (item) =>
+                    item.active
             ).length;
-
     }
-
 
     if (statBooks) {
-
         statBooks.textContent =
-            books.length;
-
+            books.filter(
+                (item) =>
+                    item.active
+            ).length;
     }
 
-
-    if (statActiveBooks) {
-
-        statActiveBooks.textContent =
-            books.filter(
-                book =>
-                    book.active
+    if (statNews) {
+        statNews.textContent =
+            newsItems.filter(
+                (item) =>
+                    item.active
             ).length;
-
     }
 }
 
+/* =========================================================
+   CATEGORIES
+========================================================= */
 
-/* =====================================================
-   PRODUCT CATEGORY SELECTS
-===================================================== */
+async function loadCategories() {
+    const {
+        data,
+        error
+    } = await supabase
+        .from("categories")
+        .select("*")
+        .order(
+            "sort_order",
+            {
+                ascending: true
+            }
+        );
 
-function fillCategorySelects() {
+    if (error) {
+        console.error(
+            "Categories error:",
+            error
+        );
 
-    const options =
+        showToast(
+            "تعذر تحميل الأقسام",
+            "error"
+        );
+
+        categories = [];
+
+        return;
+    }
+
+    categories =
+        data || [];
+
+    renderCategoriesTable();
+    updateDashboard();
+}
+
+function renderCategoriesTable() {
+    const tbody =
+        $("#categoriesTableBody");
+
+    if (!tbody) {
+        return;
+    }
+
+    if (!categories.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td
+                    colspan="5"
+                    class="empty-state"
+                >
+                    لا توجد أقسام.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    tbody.innerHTML =
         categories
             .map(
-                c => `
-                    <option value="${esc(c.id)}">
-                        ${esc(c.name)}
-                        ${c.active ? "" : " — مخفي"}
+                (category) => `
+                    <tr>
+
+                        <td>
+                            <strong>
+                                ${esc(
+                    category.name
+                )}
+                            </strong>
+
+                            ${category.description
+                        ? `
+                                        <div
+                                            style="
+                                                color:#888;
+                                                font-size:10px;
+                                                margin-top:3px;
+                                            "
+                                        >
+                                            ${esc(
+                            category.description
+                        )}
+                                        </div>
+                                    `
+                        : ""
+                    }
+                        </td>
+
+                        <td>
+                            <code>
+                                ${esc(
+                        category.slug
+                    )}
+                            </code>
+                        </td>
+
+                        <td>
+                            ${esc(
+                        category.sort_order
+                    )}
+                        </td>
+
+                        <td>
+                            <span
+                                class="
+                                    status
+                                    ${category.active
+                        ? "active"
+                        : "hidden-status"
+                    }
+                                "
+                            >
+                                ${category.active
+                        ? "ظاهر"
+                        : "مخفي"
+                    }
+                            </span>
+                        </td>
+
+                        <td>
+
+                            <div class="actions">
+
+                                <button
+                                    class="btn btn-light btn-small"
+                                    data-edit-category="${esc(
+                        category.id
+                    )}"
+                                    type="button"
+                                >
+                                    تعديل
+                                </button>
+
+                                <button
+                                    class="btn ${category.active
+                        ? "btn-danger"
+                        : "btn-green"
+                    } btn-small"
+                                    data-toggle-category="${esc(
+                        category.id
+                    )}"
+                                    type="button"
+                                >
+                                    ${category.active
+                        ? "إخفاء"
+                        : "إظهار"
+                    }
+                                </button>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+                `
+            )
+            .join("");
+}
+
+function openCategoryForm(
+    category = null
+) {
+    editingCategoryId =
+        category?.id || null;
+
+    const title =
+        category
+            ? "تعديل القسم"
+            : "إضافة قسم جديد";
+
+    openModal(
+        title,
+        `
+            <form id="categoryForm">
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+
+                        <label>
+                            اسم القسم
+                        </label>
+
+                        <input
+                            id="categoryName"
+                            class="form-control"
+                            required
+                            value="${esc(
+            category?.name || ""
+        )}"
+                            placeholder="مثال: قسم الطباعة"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            Slug
+                        </label>
+
+                        <input
+                            id="categorySlug"
+                            class="form-control"
+                            value="${esc(
+            category?.slug || ""
+        )}"
+                            placeholder="printing"
+                            dir="ltr"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            ترتيب الظهور
+                        </label>
+
+                        <input
+                            id="categorySort"
+                            class="form-control"
+                            type="number"
+                            value="${esc(
+            category?.sort_order ?? 0
+        )}"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            الحالة
+                        </label>
+
+                        <select
+                            id="categoryActive"
+                            class="form-control"
+                        >
+
+                            <option
+                                value="true"
+                                ${category?.active !== false
+            ? "selected"
+            : ""
+        }
+                            >
+                                ظاهر
+                            </option>
+
+                            <option
+                                value="false"
+                                ${category?.active === false
+            ? "selected"
+            : ""
+        }
+                            >
+                                مخفي
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                    <div class="form-group form-full">
+
+                        <label>
+                            الوصف
+                        </label>
+
+                        <textarea
+                            id="categoryDescription"
+                            class="form-control"
+                            placeholder="وصف مختصر للقسم"
+                        >${esc(
+            category?.description || ""
+        )}</textarea>
+
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+
+                    <button
+                        class="btn btn-gold"
+                        type="submit"
+                    >
+                        حفظ القسم
+                    </button>
+
+                    <button
+                        class="btn btn-light"
+                        type="button"
+                        id="cancelModalButton"
+                    >
+                        إلغاء
+                    </button>
+
+                </div>
+
+            </form>
+        `
+    );
+
+    $("#categoryName")
+        ?.addEventListener(
+            "input",
+            () => {
+                const slug =
+                    $("#categorySlug");
+
+                if (
+                    slug &&
+                    !editingCategoryId
+                ) {
+                    slug.value =
+                        slugify(
+                            $("#categoryName")
+                                .value
+                        );
+                }
+            }
+        );
+
+    $("#categoryForm")
+        ?.addEventListener(
+            "submit",
+            saveCategory
+        );
+
+    $("#cancelModalButton")
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+}
+
+async function saveCategory(
+    event
+) {
+    event.preventDefault();
+
+    const button =
+        event.submitter;
+
+    const payload = {
+        name:
+            $("#categoryName")
+                .value
+                .trim(),
+
+        slug:
+            $("#categorySlug")
+                .value
+                .trim(),
+
+        description:
+            $("#categoryDescription")
+                .value
+                .trim() ||
+            null,
+
+        sort_order:
+            Number(
+                $("#categorySort")
+                    .value || 0
+            ),
+
+        active:
+            $("#categoryActive")
+                .value === "true"
+    };
+
+    if (!payload.name) {
+        showToast(
+            "اكتب اسم القسم",
+            "error"
+        );
+
+        return;
+    }
+
+    setLoading(
+        button,
+        true,
+        "حفظ القسم"
+    );
+
+    try {
+        let result;
+
+        if (editingCategoryId) {
+            result =
+                await supabase
+                    .from("categories")
+                    .update(payload)
+                    .eq(
+                        "id",
+                        editingCategoryId
+                    );
+        } else {
+            result =
+                await supabase
+                    .from("categories")
+                    .insert(
+                        payload
+                    );
+        }
+
+        if (result.error) {
+            throw result.error;
+        }
+
+        showToast(
+            "تم حفظ القسم بنجاح",
+            "success"
+        );
+
+        closeModal();
+
+        await loadCategories();
+
+        await loadProducts();
+
+    } catch (error) {
+        console.error(error);
+
+        showToast(
+            error.message ||
+            "تعذر حفظ القسم",
+            "error"
+        );
+    } finally {
+        setLoading(
+            button,
+            false,
+            "حفظ القسم"
+        );
+    }
+}
+
+async function toggleCategory(
+    id
+) {
+    const category =
+        categories.find(
+            (item) =>
+                item.id === id
+        );
+
+    if (!category) {
+        return;
+    }
+
+    const {
+        error
+    } = await supabase
+        .from("categories")
+        .update({
+            active:
+                !category.active
+        })
+        .eq(
+            "id",
+            id
+        );
+
+    if (error) {
+        showToast(
+            "تعذر تغيير حالة القسم",
+            "error"
+        );
+
+        return;
+    }
+
+    showToast(
+        category.active
+            ? "تم إخفاء القسم"
+            : "تم إظهار القسم",
+        "success"
+    );
+
+    await loadCategories();
+}
+
+/* =========================================================
+   PRODUCTS
+========================================================= */
+
+async function loadProducts() {
+    const {
+        data,
+        error
+    } = await supabase
+        .from("products")
+        .select("*")
+        .order(
+            "sort_order",
+            {
+                ascending: true
+            }
+        );
+
+    if (error) {
+        console.error(
+            "Products error:",
+            error
+        );
+
+        showToast(
+            "تعذر تحميل المنتجات",
+            "error"
+        );
+
+        products = [];
+
+        return;
+    }
+
+    products =
+        data || [];
+
+    renderProductsTable();
+    updateDashboard();
+}
+
+function getCategoryName(
+    categoryId
+) {
+    return (
+        categories.find(
+            (item) =>
+                item.id ===
+                categoryId
+        )?.name ||
+        "غير محدد"
+    );
+}
+
+function renderProductsTable() {
+    const tbody =
+        $("#productsTableBody");
+
+    if (!tbody) {
+        return;
+    }
+
+    const search =
+        (
+            $("#productAdminSearch")
+                ?.value || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    let list =
+        [...products];
+
+    if (search) {
+        list =
+            list.filter(
+                (product) =>
+                    [
+                        product.name,
+                        product.description,
+                        product.category
+                    ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .toLowerCase()
+                        .includes(search)
+            );
+    }
+
+    if (!list.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td
+                    colspan="6"
+                    class="empty-state"
+                >
+                    لا توجد منتجات.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    tbody.innerHTML =
+        list
+            .map(
+                (product) => `
+                    <tr>
+
+                        <td>
+
+                            ${product.image_url
+                        ? `
+                                        <img
+                                            class="table-image"
+                                            src="${esc(
+                            product.image_url
+                        )}"
+                                            alt=""
+                                        >
+                                    `
+                        : `
+                                        <div class="table-placeholder">
+                                            بصمة
+                                        </div>
+                                    `
+                    }
+
+                        </td>
+
+                        <td>
+                            <strong>
+                                ${esc(
+                        product.name
+                    )}
+                            </strong>
+
+                            ${product.description
+                        ? `
+                                        <div
+                                            style="
+                                                color:#888;
+                                                font-size:10px;
+                                                margin-top:4px;
+                                            "
+                                        >
+                                            ${esc(
+                            product.description
+                        )}
+                                        </div>
+                                    `
+                        : ""
+                    }
+                        </td>
+
+                        <td>
+                            ${esc(
+                        getCategoryName(
+                            product.category_id
+                        )
+                    )}
+                        </td>
+
+                        <td>
+                            ${product.price_note
+                        ? esc(
+                            product.price_note
+                        )
+                        : product.price !==
+                            null &&
+                            product.price !==
+                            undefined
+                            ? `${money(
+                                product.price
+                            )} ج.م`
+                            : "حسب التصميم"
+                    }
+                        </td>
+
+                        <td>
+
+                            <span
+                                class="
+                                    status
+                                    ${product.active
+                        ? "active"
+                        : "hidden-status"
+                    }
+                                "
+                            >
+                                ${product.active
+                        ? "ظاهر"
+                        : "مخفي"
+                    }
+                            </span>
+
+                        </td>
+
+                        <td>
+
+                            <div class="actions">
+
+                                <button
+                                    class="btn btn-light btn-small"
+                                    type="button"
+                                    data-edit-product="${esc(
+                        product.id
+                    )}"
+                                >
+                                    تعديل
+                                </button>
+
+                                <button
+                                    class="btn ${product.active
+                        ? "btn-danger"
+                        : "btn-green"
+                    } btn-small"
+                                    type="button"
+                                    data-toggle-product="${esc(
+                        product.id
+                    )}"
+                                >
+                                    ${product.active
+                        ? "إخفاء"
+                        : "إظهار"
+                    }
+                                </button>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+                `
+            )
+            .join("");
+}
+
+function productFormHtml(
+    product = null
+) {
+    const categoryOptions =
+        categories
+            .map(
+                (category) => `
+                    <option
+                        value="${esc(
+                    category.id
+                )}"
+                        ${product?.category_id ===
+                        category.id
+                        ? "selected"
+                        : ""
+                    }
+                    >
+                        ${esc(
+                        category.name
+                    )}
                     </option>
                 `
             )
             .join("");
 
+    return `
+        <form id="productForm">
 
-    if ($("#productCategory")) {
+            <div class="form-grid">
 
-        $("#productCategory").innerHTML = `
-            <option value="">
-                اختر القسم
-            </option>
+                <div class="form-group">
 
-            ${options}
-        `;
+                    <label>
+                        اسم المنتج
+                    </label>
 
-    }
-
-
-    const oldValue =
-        $("#productCategoryFilter")
-            ?.value || "";
-
-
-    if ($("#productCategoryFilter")) {
-
-        $("#productCategoryFilter")
-            .innerHTML = `
-                <option value="">
-                    كل الأقسام
-                </option>
-
-                ${options}
-            `;
-
-
-        $("#productCategoryFilter")
-            .value =
-            oldValue;
-
-    }
-}
-
-
-/* =====================================================
-   PRODUCT CATEGORIES
-===================================================== */
-
-function renderCategories() {
-
-    const search =
-        $("#categorySearch")
-            ?.value
-            .trim()
-            .toLowerCase() || "";
-
-
-    const list =
-        categories.filter(
-            c =>
-                !search ||
-                String(c.name)
-                    .toLowerCase()
-                    .includes(search)
-        );
-
-
-    const container =
-        $("#adminCategories");
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML =
-        list
-            .map(
-                c => `
-                    <article
-                        class="category-admin-card"
+                    <input
+                        id="productName"
+                        class="form-control"
+                        required
+                        value="${esc(
+        product?.name || ""
+    )}"
                     >
 
-                        <div class="category-admin-top">
-
-                            <div class="category-admin-icon">
-                                ✦
-                            </div>
-
-                            <div>
-
-                                <strong>
-                                    ${esc(c.name)}
-                                </strong>
-
-                                <p>
-                                    ${esc(
-                    c.description || ""
-                )}
-                                </p>
-
-                                <small>
-                                    الترتيب:
-                                    ${c.sort_order}
-                                    •
-                                    ${c.active
-                        ? "ظاهر"
-                        : "مخفي"
-                    }
-                                </small>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="row-actions">
-
-                            <button
-                                type="button"
-                                data-edit-cat="${esc(c.id)}"
-                            >
-                                تعديل
-                            </button>
-
-                            <button
-                                type="button"
-                                data-toggle-cat="${esc(c.id)}"
-                            >
-                                ${c.active
-                        ? "إخفاء"
-                        : "إظهار"
-                    }
-                            </button>
-
-                        </div>
-
-                    </article>
-                `
-            )
-            .join("")
-        ||
-        `
-            <div class="empty-state">
-                لا توجد أقسام.
-            </div>
-        `;
-
-
-    document
-        .querySelectorAll(
-            "[data-edit-cat]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        openCategory(
-                            button.dataset.editCat
-                        );
-
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            "[data-toggle-cat]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        toggleCategory(
-                            button.dataset.toggleCat
-                        );
-
-            }
-        );
-}
-
-
-/* =====================================================
-   PRODUCTS
-===================================================== */
-
-function renderProducts() {
-
-    const search =
-        $("#productSearch")
-            ?.value
-            .trim()
-            .toLowerCase() || "";
-
-
-    const categoryId =
-        $("#productCategoryFilter")
-            ?.value || "";
-
-
-    const list =
-        products.filter(
-            product => {
-
-                const categoryMatch =
-                    !categoryId ||
-                    String(product.category_id) ===
-                    String(categoryId);
-
-
-                const searchText =
-                    [
-                        product.name,
-                        product.description,
-                        product.price_note
-                    ]
-                        .filter(Boolean)
-                        .join(" ")
-                        .toLowerCase();
-
-
-                const searchMatch =
-                    !search ||
-                    searchText.includes(search);
-
-
-                return (
-                    categoryMatch &&
-                    searchMatch
-                );
-            }
-        );
-
-
-    const container =
-        $("#adminProducts");
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML =
-        list
-            .map(productCard)
-            .join("")
-        ||
-        `
-            <div class="empty-state">
-                لا توجد منتجات مطابقة.
-            </div>
-        `;
-
-
-    document
-        .querySelectorAll(
-            "[data-edit-product]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        openProduct(
-                            button.dataset.editProduct
-                        );
-
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            "[data-toggle-product]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        toggleProduct(
-                            button.dataset.toggleProduct
-                        );
-
-            }
-        );
-}
-
-
-/* =====================================================
-   PRODUCT CARD
-===================================================== */
-
-function productCard(product) {
-
-    const category =
-        categories.find(
-            c =>
-                String(c.id) ===
-                String(product.category_id)
-        );
-
-
-    const image =
-        product.image_url
-            ? `
-                <img
-                    src="${esc(product.image_url)}"
-                    alt="${esc(product.name)}"
-                >
-            `
-            : `
-                <div class="admin-placeholder">
-                    بدون صورة
                 </div>
-            `;
 
 
-    const price =
-        product.price !== null &&
-            product.price !== undefined &&
-            Number(product.price) > 0
+                <div class="form-group">
 
-            ? `${money(product.price)} ج.م`
+                    <label>
+                        القسم
+                    </label>
 
-            : "حسب الطلب";
+                    <select
+                        id="productCategory"
+                        class="form-control"
+                    >
 
+                        <option value="">
+                            اختر القسم
+                        </option>
 
-    return `
-        <article
-            class="admin-product-card"
-        >
+                        ${categoryOptions}
 
-            <div class="admin-product-image">
-                ${image}
-            </div>
+                    </select>
 
-
-            <div class="admin-product-main">
-
-                <span class="eyebrow">
-                    ${esc(
-        category?.name ||
-        product.category ||
-        "بدون قسم"
-    )}
-                </span>
+                </div>
 
 
-                <h3>
-                    ${esc(product.name)}
-                </h3>
+                <div class="form-group">
+
+                    <label>
+                        السعر
+                    </label>
+
+                    <input
+                        id="productPrice"
+                        class="form-control"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value="${esc(
+        product?.price ?? ""
+    )}"
+                        placeholder="مثال: 150"
+                    >
+
+                </div>
 
 
-                <div class="admin-price">
+                <div class="form-group">
 
-                    ${price}
+                    <label>
+                        ملاحظة السعر
+                    </label>
 
-                    ${product.price_note
-            ? `
-                                <small>
-                                    ${esc(
-                product.price_note
-            )}
-                                </small>
-                            `
+                    <input
+                        id="productPriceNote"
+                        class="form-control"
+                        value="${esc(
+        product?.price_note || ""
+    )}"
+                        placeholder="مثال: يبدأ من 100 ج.م"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        ترتيب الظهور
+                    </label>
+
+                    <input
+                        id="productSort"
+                        class="form-control"
+                        type="number"
+                        value="${esc(
+        product?.sort_order ?? 0
+    )}"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        الحالة
+                    </label>
+
+                    <select
+                        id="productActive"
+                        class="form-control"
+                    >
+
+                        <option
+                            value="true"
+                            ${product?.active !== false
+            ? "selected"
             : ""
         }
+                        >
+                            ظاهر
+                        </option>
+
+                        <option
+                            value="false"
+                            ${product?.active === false
+            ? "selected"
+            : ""
+        }
+                        >
+                            مخفي
+                        </option>
+
+                    </select>
 
                 </div>
 
 
-                <span
-                    class="status ${product.active
-            ? "on"
-            : "off"
-        }"
-                >
-                    ${product.active
-            ? "ظاهر"
-            : "مخفي"
+                <div class="form-group form-full">
+
+                    <label>
+                        وصف المنتج
+                    </label>
+
+                    <textarea
+                        id="productDescription"
+                        class="form-control"
+                    >${esc(
+            product?.description || ""
+        )}</textarea>
+
+                </div>
+
+
+                <div class="form-group form-full">
+
+                    <label>
+                        صورة المنتج
+                    </label>
+
+                    <div class="file-box">
+
+                        <strong>
+                            اختر صورة من الجهاز
+                        </strong>
+
+                        <span>
+                            JPG / PNG / WEBP
+                        </span>
+
+                        <input
+                            id="productImage"
+                            type="file"
+                            accept="image/*"
+                        >
+
+                        ${product?.image_url
+            ? `
+                                    <img
+                                        id="productPreview"
+                                        class="preview-image"
+                                        src="${esc(
+                product.image_url
+            )}"
+                                        alt=""
+                                    >
+                                `
+            : `
+                                    <img
+                                        id="productPreview"
+                                        class="preview-image hidden"
+                                        alt=""
+                                    >
+                                `
         }
-                </span>
 
-
-                <div class="row-actions">
-
-                    <button
-                        type="button"
-                        data-edit-product="${esc(product.id)}"
-                    >
-                        تعديل
-                    </button>
-
-
-                    <button
-                        type="button"
-                        data-toggle-product="${esc(product.id)}"
-                    >
-                        ${product.active
-            ? "إخفاء"
-            : "إظهار"
-        }
-                    </button>
+                    </div>
 
                 </div>
 
             </div>
 
-        </article>
+
+            <div class="form-actions">
+
+                <button
+                    class="btn btn-gold"
+                    type="submit"
+                >
+                    حفظ المنتج
+                </button>
+
+                <button
+                    id="cancelModalButton"
+                    class="btn btn-light"
+                    type="button"
+                >
+                    إلغاء
+                </button>
+
+            </div>
+
+        </form>
     `;
 }
 
-
-/* =====================================================
-   NEWS
-===================================================== */
-
-function renderNews() {
-
-    const container =
-        $("#adminNews");
-
-
-    if (!container) {
-        return;
-    }
-
-
-    if (!newsItems.length) {
-
-        container.innerHTML = `
-            <div class="empty-state">
-                لا توجد أخبار حاليًا.
-                اضغط على "إضافة خبر" لإنشاء أول خبر.
-            </div>
-        `;
-
-        return;
-    }
-
-
-    container.innerHTML =
-        newsItems
-            .map(
-                news => `
-                    <article
-                        class="admin-news-card"
-                    >
-
-                        <div class="admin-news-main">
-
-                            <div class="admin-news-status">
-
-                                <span
-                                    class="status ${news.active
-                        ? "on"
-                        : "off"
-                    }"
-                                >
-                                    ${news.active
-                        ? "ظاهر"
-                        : "مخفي"
-                    }
-                                </span>
-
-                                <small>
-                                    الترتيب:
-                                    ${news.sort_order}
-                                </small>
-
-                            </div>
-
-
-                            <p class="admin-news-text">
-                                ${esc(news.text)}
-                            </p>
-
-                        </div>
-
-
-                        <div class="row-actions">
-
-                            <button
-                                type="button"
-                                data-edit-news="${esc(news.id)}"
-                            >
-                                تعديل
-                            </button>
-
-
-                            <button
-                                type="button"
-                                data-toggle-news="${esc(news.id)}"
-                            >
-                                ${news.active
-                        ? "إخفاء"
-                        : "إظهار"
-                    }
-                            </button>
-
-
-                            <button
-                                type="button"
-                                data-delete-news="${esc(news.id)}"
-                                class="danger-btn"
-                            >
-                                حذف
-                            </button>
-
-                        </div>
-
-                    </article>
-                `
-            )
-            .join("");
-
-
-    document
-        .querySelectorAll(
-            "[data-edit-news]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        openNews(
-                            button.dataset.editNews
-                        );
-
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            "[data-toggle-news]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        toggleNews(
-                            button.dataset.toggleNews
-                        );
-
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            "[data-delete-news]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        deleteNews(
-                            button.dataset.deleteNews
-                        );
-
-            }
-        );
-}
-
-
-/* =====================================================
-   OPEN NEWS
-===================================================== */
-
-function openNews(id = null) {
-
-    editingNewsId = id;
-
-
-    const news =
-        newsItems.find(
-            item =>
-                String(item.id) ===
-                String(id)
-        );
-
-
-    $("#newsModalTitle")
-        .textContent =
-        id
-            ? "تعديل الخبر"
-            : "إضافة خبر";
-
-
-    $("#newsId")
-        .value =
-        id || "";
-
-
-    $("#newsText")
-        .value =
-        news?.text || "";
-
-
-    $("#newsOrder")
-        .value =
-        news?.sort_order ??
-        newsItems.length;
-
-
-    $("#newsActive")
-        .checked =
-        news?.active ??
-        true;
-
-
-    msg(
-        "#newsFormMessage",
-        ""
-    );
-
-
-    $("#newsModal")
-        ?.classList
-        .remove("hidden");
-}
-
-
-/* =====================================================
-   SAVE NEWS
-===================================================== */
-
-async function saveNews() {
-
-    const text =
-        $("#newsText")
-            ?.value
-            .trim() || "";
-
-
-    const sortOrder =
-        Number(
-            $("#newsOrder")
-                ?.value
-        ) || 0;
-
-
-    const active =
-        $("#newsActive")
-            ?.checked ??
-        true;
-
-
-    if (!text) {
-
-        return msg(
-            "#newsFormMessage",
-            "اكتب نص الخبر."
-        );
-
-    }
-
-
-    if (text.length > 250) {
-
-        return msg(
-            "#newsFormMessage",
-            "نص الخبر يجب ألا يتجاوز 250 حرفًا."
-        );
-
-    }
-
-
-    const payload = {
-
-        text,
-
-        active,
-
-        sort_order:
-            sortOrder,
-
-        updated_at:
-            now()
-
-    };
-
-
-    msg(
-        "#newsFormMessage",
-        "جاري الحفظ...",
-        false
-    );
-
-
-    const result =
-        editingNewsId
-
-            ? await supabase
-                .from("news_ticker")
-                .update(payload)
-                .eq(
-                    "id",
-                    editingNewsId
-                )
-
-            : await supabase
-                .from("news_ticker")
-                .insert(payload);
-
-
-    if (result.error) {
-
-        return msg(
-            "#newsFormMessage",
-            "تعذر حفظ الخبر: " +
-            result.error.message
-        );
-
-    }
-
-
-    $("#newsModal")
-        ?.classList
-        .add("hidden");
-
-
-    editingNewsId = null;
-
-
-    await loadAll();
-}
-
-
-/* =====================================================
-   TOGGLE NEWS
-===================================================== */
-
-async function toggleNews(id) {
-
-    const news =
-        newsItems.find(
-            item =>
-                String(item.id) ===
-                String(id)
-        );
-
-
-    if (!news) {
-        return;
-    }
-
-
-    const {
-        error
-    } =
-        await supabase
-            .from("news_ticker")
-            .update({
-
-                active:
-                    !news.active,
-
-                updated_at:
-                    now()
-
-            })
-            .eq(
-                "id",
-                id
-            );
-
-
-    if (error) {
-
-        alert(
-            "تعذر تغيير حالة الخبر:\n" +
-            error.message
-        );
-
-        return;
-    }
-
-
-    await loadAll();
-}
-
-
-/* =====================================================
-   DELETE NEWS
-===================================================== */
-
-async function deleteNews(id) {
-
-    const news =
-        newsItems.find(
-            item =>
-                String(item.id) ===
-                String(id)
-        );
-
-
-    if (!news) {
-        return;
-    }
-
-
-    const confirmed =
-        confirm(
-            "هل أنت متأكد من حذف هذا الخبر؟\n\n" +
-            news.text
-        );
-
-
-    if (!confirmed) {
-        return;
-    }
-
-
-    const {
-        error
-    } =
-        await supabase
-            .from("news_ticker")
-            .delete()
-            .eq(
-                "id",
-                id
-            );
-
-
-    if (error) {
-
-        alert(
-            "تعذر حذف الخبر:\n" +
-            error.message
-        );
-
-        return;
-    }
-
-
-    await loadAll();
-}
-
-
-/* =====================================================
-   OPEN PRODUCT CATEGORY
-===================================================== */
-
-function openCategory(id = null) {
-
-    editingCategoryId = id;
-
-
-    const category =
-        categories.find(
-            c =>
-                String(c.id) ===
-                String(id)
-        );
-
-
-    $("#categoryModalTitle")
-        .textContent =
-        id
-            ? "تعديل القسم"
-            : "إضافة قسم";
-
-
-    $("#categoryId")
-        .value =
-        id || "";
-
-
-    $("#categoryName")
-        .value =
-        category?.name || "";
-
-
-    $("#categoryDescription")
-        .value =
-        category?.description || "";
-
-
-    $("#categoryOrder")
-        .value =
-        category?.sort_order ??
-        categories.length + 1;
-
-
-    $("#categoryActive")
-        .checked =
-        category?.active ??
-        true;
-
-
-    msg(
-        "#categoryMessage",
-        ""
-    );
-
-
-    $("#categoryModal")
-        ?.classList
-        .remove("hidden");
-}
-
-
-/* =====================================================
-   SAVE PRODUCT CATEGORY
-===================================================== */
-
-async function saveCategory() {
-
-    const name =
-        $("#categoryName")
-            .value
-            .trim();
-
-
-    if (!name) {
-
-        return msg(
-            "#categoryMessage",
-            "اكتب اسم القسم."
-        );
-
-    }
-
-
-    let slug;
-
-
-    if (editingCategoryId) {
-
-        slug =
-            categories.find(
-                c =>
-                    String(c.id) ===
-                    String(editingCategoryId)
-            )?.slug ||
-            `category-${editingCategoryId}`;
-
-    } else {
-
-        const baseSlug =
-            name
-                .toLowerCase()
-                .replace(
-                    /[^\p{L}\p{N}]+/gu,
-                    "-"
-                )
-                .replace(
-                    /^-|-$/g,
-                    ""
-                );
-
-
-        slug =
-            `${baseSlug}-${crypto
-                .randomUUID()
-                .slice(0, 8)}`;
-
-    }
-
-
-    const payload = {
-
-        name,
-
-        slug,
-
-        description:
-            $("#categoryDescription")
-                .value
-                .trim(),
-
-        sort_order:
-            Number(
-                $("#categoryOrder")
-                    .value
-            ) || 0,
-
-        active:
-            $("#categoryActive")
-                .checked,
-
-        updated_at:
-            now()
-
-    };
-
-
-    msg(
-        "#categoryMessage",
-        "جاري الحفظ...",
-        false
-    );
-
-
-    const result =
-        editingCategoryId
-
-            ? await supabase
-                .from("categories")
-                .update(payload)
-                .eq(
-                    "id",
-                    editingCategoryId
-                )
-
-            : await supabase
-                .from("categories")
-                .insert(payload);
-
-
-    if (result.error) {
-
-        return msg(
-            "#categoryMessage",
-            result.error.message
-        );
-
-    }
-
-
-    $("#categoryModal")
-        ?.classList
-        .add("hidden");
-
-
-    await loadAll();
-}
-
-
-/* =====================================================
-   TOGGLE PRODUCT CATEGORY
-===================================================== */
-
-async function toggleCategory(id) {
-
-    const category =
-        categories.find(
-            c =>
-                String(c.id) ===
-                String(id)
-        );
-
-
-    if (!category) {
-        return;
-    }
-
-
-    const {
-        error
-    } =
-        await supabase
-            .from("categories")
-            .update({
-
-                active:
-                    !category.active,
-
-                updated_at:
-                    now()
-
-            })
-            .eq(
-                "id",
-                id
-            );
-
-
-    if (error) {
-
-        alert(error.message);
-
-        return;
-    }
-
-
-    await loadAll();
-}
-
-
-/* =====================================================
-   OPEN PRODUCT
-===================================================== */
-
-function openProduct(id = null) {
-
-    editingProductId = id;
-
-    selectedFile = null;
-
-
-    const product =
-        products.find(
-            p =>
-                String(p.id) ===
-                String(id)
-        );
-
-
-    $("#productModalTitle")
-        .textContent =
-        id
+function openProductForm(
+    product = null
+) {
+    editingProductId =
+        product?.id || null;
+
+    openModal(
+        product
             ? "تعديل المنتج"
-            : "إضافة منتج";
-
-
-    $("#productId")
-        .value =
-        id || "";
-
-
-    $("#productName")
-        .value =
-        product?.name || "";
-
-
-    $("#productCategory")
-        .value =
-        product?.category_id || "";
-
-
-    $("#productPrice")
-        .value =
-        product?.price ?? "";
-
-
-    $("#productPriceNote")
-        .value =
-        product?.price_note || "";
-
-
-    $("#productDescription")
-        .value =
-        product?.description || "";
-
-
-    $("#productActive")
-        .checked =
-        product?.active ??
-        true;
-
-
-    $("#productOrder")
-        .value =
-        product?.sort_order ??
-        0;
-
-
-    $("#productImageFile")
-        .value =
-        "";
-
-
-    if (product?.image_url) {
-
-        $("#imagePreview")
-            .innerHTML = `
-                <img
-                    src="${esc(product.image_url)}"
-                    alt=""
-                >
-            `;
-
-    } else {
-
-        $("#imagePreview")
-            .innerHTML =
-            "";
-
-    }
-
-
-    msg(
-        "#productMessage",
-        ""
+            : "إضافة منتج جديد",
+        productFormHtml(product)
     );
 
+    $("#productImage")
+        ?.addEventListener(
+            "change",
+            previewProductImage
+        );
 
-    $("#productModal")
-        ?.classList
-        .remove("hidden");
+    $("#productForm")
+        ?.addEventListener(
+            "submit",
+            saveProduct
+        );
+
+    $("#cancelModalButton")
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
 }
 
+function previewProductImage(
+    event
+) {
+    const file =
+        event.target.files?.[0];
 
-/* =====================================================
-   PRODUCT IMAGE
-===================================================== */
-
-$("#productImageFile")
-    ?.addEventListener(
-        "change",
-        event => {
-
-            selectedFile =
-                event.target.files[0] ||
-                null;
-
-
-            if (!selectedFile) {
-                return;
-            }
-
-
-            if (
-                selectedFile.size >
-                5 * 1024 * 1024
-            ) {
-
-                selectedFile = null;
-
-                event.target.value = "";
-
-                return msg(
-                    "#productMessage",
-                    "الصورة أكبر من 5MB."
-                );
-
-            }
-
-
-            const allowedTypes = [
-                "image/jpeg",
-                "image/png",
-                "image/webp"
-            ];
-
-
-            if (
-                !allowedTypes.includes(
-                    selectedFile.type
-                )
-            ) {
-
-                selectedFile = null;
-
-                event.target.value = "";
-
-                return msg(
-                    "#productMessage",
-                    "نوع الصورة غير مدعوم."
-                );
-
-            }
-
-
-            const url =
-                URL.createObjectURL(
-                    selectedFile
-                );
-
-
-            $("#imagePreview")
-                .innerHTML = `
-                    <img
-                        src="${url}"
-                        alt="معاينة"
-                    >
-                `;
-        }
-    );
-
-
-/* =====================================================
-   SAVE PRODUCT
-===================================================== */
-
-async function saveProduct() {
-
-    const name =
-        $("#productName")
-            .value
-            .trim();
-
-
-    const categoryId =
-        $("#productCategory")
-            .value;
-
-
-    const priceText =
-        $("#productPrice")
-            .value
-            .trim();
-
-
-    const price =
-        priceText === ""
-            ? null
-            : Number(priceText);
-
-
-    const category =
-        categories.find(
-            c =>
-                String(c.id) ===
-                String(categoryId)
-        );
-
-
-    if (!name) {
-
-        return msg(
-            "#productMessage",
-            "اكتب اسم المنتج."
-        );
-
-    }
-
-
-    if (!categoryId) {
-
-        return msg(
-            "#productMessage",
-            "اختر القسم."
-        );
-
-    }
-
+    const preview =
+        $("#productPreview");
 
     if (
-        price !== null &&
-        (
-            !Number.isFinite(price) ||
-            price < 0
-        )
+        !file ||
+        !preview
     ) {
-
-        return msg(
-            "#productMessage",
-            "اكتب سعرًا صحيحًا."
-        );
-
+        return;
     }
 
-
-    let imageUrl =
-        products.find(
-            p =>
-                String(p.id) ===
-                String(editingProductId)
-        )?.image_url ||
-        null;
-
-
-    if (selectedFile) {
-
-        const extension =
-            selectedFile.name
-                .split(".")
-                .pop()
-                .toLowerCase();
-
-
-        const path =
-            `products/${crypto.randomUUID()}.${extension}`;
-
-
-        msg(
-            "#productMessage",
-            "جاري رفع الصورة...",
-            false
+    preview.src =
+        URL.createObjectURL(
+            file
         );
 
-
-        const upload =
-            await supabase
-                .storage
-                .from("product-images")
-                .upload(
-                    path,
-                    selectedFile,
-                    {
-                        upsert: false,
-                        contentType:
-                            selectedFile.type
-                    }
-                );
-
-
-        if (upload.error) {
-
-            return msg(
-                "#productMessage",
-                "تعذر رفع الصورة: " +
-                upload.error.message
-            );
-
-        }
-
-
-        imageUrl =
-            supabase
-                .storage
-                .from("product-images")
-                .getPublicUrl(path)
-                .data
-                .publicUrl;
-
-    }
-
-
-    const payload = {
-
-        name,
-
-        category_id:
-            categoryId,
-
-        category:
-            category?.name ||
-            "",
-
-        price,
-
-        price_note:
-            $("#productPriceNote")
-                .value
-                .trim(),
-
-        description:
-            $("#productDescription")
-                .value
-                .trim(),
-
-        image_url:
-            imageUrl,
-
-        active:
-            $("#productActive")
-                .checked,
-
-        sort_order:
-            Number(
-                $("#productOrder")
-                    .value
-            ) || 0,
-
-        updated_at:
-            now()
-
-    };
-
-
-    msg(
-        "#productMessage",
-        "جاري حفظ المنتج...",
-        false
+    preview.classList.remove(
+        "hidden"
     );
-
-
-    const result =
-        editingProductId
-
-            ? await supabase
-                .from("products")
-                .update(payload)
-                .eq(
-                    "id",
-                    editingProductId
-                )
-
-            : await supabase
-                .from("products")
-                .insert(payload);
-
-
-    if (result.error) {
-
-        return msg(
-            "#productMessage",
-            result.error.message
-        );
-
-    }
-
-
-    $("#productModal")
-        ?.classList
-        .add("hidden");
-
-
-    await loadAll();
 }
 
+async function saveProduct(
+    event
+) {
+    event.preventDefault();
 
-/* =====================================================
-   TOGGLE PRODUCT
-===================================================== */
+    const button =
+        event.submitter;
 
-async function toggleProduct(id) {
+    setLoading(
+        button,
+        true,
+        "حفظ المنتج"
+    );
 
-    const product =
-        products.find(
-            p =>
-                String(p.id) ===
-                String(id)
+    try {
+        const file =
+            $("#productImage")
+                ?.files?.[0];
+
+        let imageUrl =
+            products.find(
+                (item) =>
+                    item.id ===
+                    editingProductId
+            )?.image_url ||
+            null;
+
+        if (file) {
+            const uploaded =
+                await uploadFile(
+                    PRODUCT_BUCKET,
+                    file,
+                    "products"
+                );
+
+            imageUrl =
+                uploaded?.url ||
+                imageUrl;
+        }
+
+        const priceValue =
+            $("#productPrice")
+                .value;
+
+        const payload = {
+            name:
+                $("#productName")
+                    .value
+                    .trim(),
+
+            description:
+                $("#productDescription")
+                    .value
+                    .trim() ||
+                null,
+
+            category_id:
+                $("#productCategory")
+                    .value ||
+                null,
+
+            price:
+                priceValue === ""
+                    ? null
+                    : Number(
+                        priceValue
+                    ),
+
+            price_note:
+                $("#productPriceNote")
+                    .value
+                    .trim() ||
+                null,
+
+            image_url:
+                imageUrl,
+
+            sort_order:
+                Number(
+                    $("#productSort")
+                        .value || 0
+                ),
+
+            active:
+                $("#productActive")
+                    .value === "true"
+        };
+
+        if (!payload.name) {
+            throw new Error(
+                "اسم المنتج مطلوب"
+            );
+        }
+
+        let result;
+
+        if (editingProductId) {
+            result =
+                await supabase
+                    .from("products")
+                    .update(payload)
+                    .eq(
+                        "id",
+                        editingProductId
+                    );
+        } else {
+            result =
+                await supabase
+                    .from("products")
+                    .insert(
+                        payload
+                    );
+        }
+
+        if (result.error) {
+            throw result.error;
+        }
+
+        showToast(
+            "تم حفظ المنتج بنجاح",
+            "success"
         );
 
+        closeModal();
+
+        await loadProducts();
+
+    } catch (error) {
+        console.error(error);
+
+        showToast(
+            error.message ||
+            "تعذر حفظ المنتج",
+            "error"
+        );
+    } finally {
+        setLoading(
+            button,
+            false,
+            "حفظ المنتج"
+        );
+    }
+}
+
+async function toggleProduct(
+    id
+) {
+    const product =
+        products.find(
+            (item) =>
+                item.id === id
+        );
 
     if (!product) {
         return;
     }
 
-
     const {
         error
-    } =
-        await supabase
-            .from("products")
-            .update({
-
-                active:
-                    !product.active,
-
-                updated_at:
-                    now()
-
-            })
-            .eq(
-                "id",
-                id
-            );
-
+    } = await supabase
+        .from("products")
+        .update({
+            active:
+                !product.active
+        })
+        .eq(
+            "id",
+            id
+        );
 
     if (error) {
-
-        alert(error.message);
+        showToast(
+            "تعذر تغيير حالة المنتج",
+            "error"
+        );
 
         return;
     }
 
+    showToast(
+        product.active
+            ? "تم إخفاء المنتج"
+            : "تم إظهار المنتج",
+        "success"
+    );
 
-    await loadAll();
+    await loadProducts();
 }
 
+/* =========================================================
+   BOOK CATEGORIES
+========================================================= */
 
-/* =====================================================
-   =====================================================
-   BOOK LIBRARY
-   =====================================================
-   ===================================================== */
+async function loadBookCategories() {
+    const {
+        data,
+        error
+    } = await supabase
+        .from("book_categories")
+        .select("*")
+        .order(
+            "sort_order",
+            {
+                ascending: true
+            }
+        );
 
+    if (error) {
+        console.error(
+            "Book categories error:",
+            error
+        );
 
-/* =====================================================
-   BOOK CATEGORY SELECT
-===================================================== */
+        bookCategories = [];
 
-function fillBookCategorySelect() {
+        showToast(
+            "تعذر تحميل أقسام الكتب",
+            "error"
+        );
 
-    const select =
-        $("#bookCategory");
-
-
-    if (!select) {
         return;
     }
 
+    bookCategories =
+        data || [];
 
-    select.innerHTML = `
-        <option value="">
-            اختر قسم الكتاب
-        </option>
-
-        ${bookCategories
-            .map(
-                category => `
-                        <option
-                            value="${esc(category.id)}"
-                        >
-                            ${esc(category.name)}
-                            ${category.active
-                        ? ""
-                        : " — مخفي"
-                    }
-                        </option>
-                    `
-            )
-            .join("")
-        }
-    `;
+    renderBookCategoriesTable();
 }
 
+function renderBookCategoriesTable() {
+    const tbody =
+        $("#bookCategoriesTableBody");
 
-/* =====================================================
-   BOOK CATEGORY ICON
-===================================================== */
-
-function bookCategoryIcon(slug) {
-
-    const icons = {
-
-        law: "⚖",
-
-        legal: "⚖",
-
-        literature: "✒",
-
-        novels: "▤",
-
-        religion: "☾",
-
-        education: "▣",
-
-        children: "♡",
-
-        history: "⌛",
-
-        science: "✦",
-
-        technology: "⌘",
-
-        medicine: "✚",
-
-        business: "◈"
-
-    };
-
-
-    return icons[slug] || "▤";
-}
-
-
-/* =====================================================
-   RENDER BOOK CATEGORIES
-===================================================== */
-
-function renderBookCategories() {
-
-    const container =
-        $("#adminBookCategories");
-
-
-    if (!container) {
+    if (!tbody) {
         return;
     }
-
 
     if (!bookCategories.length) {
-
-        container.innerHTML = `
-            <div class="empty-state">
-                لا توجد أقسام كتب حتى الآن.
-                اضغط على "قسم كتب جديد".
-            </div>
+        tbody.innerHTML = `
+            <tr>
+                <td
+                    colspan="5"
+                    class="empty-state"
+                >
+                    لا توجد أقسام كتب.
+                </td>
+            </tr>
         `;
 
         return;
     }
 
-
-    container.innerHTML =
+    tbody.innerHTML =
         bookCategories
             .map(
-                category => {
+                (category) => `
+                    <tr>
 
-                    const count =
-                        books.filter(
-                            book =>
-                                String(book.category_id) ===
-                                String(category.id)
-                        ).length;
+                        <td>
+                            <strong>
+                                ${esc(
+                    category.name
+                )}
+                            </strong>
 
+                            ${category.description
+                        ? `
+                                        <div
+                                            style="
+                                                color:#888;
+                                                font-size:10px;
+                                                margin-top:3px;
+                                            "
+                                        >
+                                            ${esc(
+                            category.description
+                        )}
+                                        </div>
+                                    `
+                        : ""
+                    }
+                        </td>
 
-                    return `
-                        <article
-                            class="category-admin-card"
-                        >
-
-                            <div class="category-admin-top">
-
-                                <div class="category-admin-icon">
-                                    ${bookCategoryIcon(
+                        <td>
+                            ${esc(
                         category.slug
                     )}
-                                </div>
+                        </td>
 
+                        <td>
+                            ${esc(
+                        category.sort_order
+                    )}
+                        </td>
 
-                                <div>
+                        <td>
 
-                                    <strong>
-                                        ${esc(category.name)}
-                                    </strong>
+                            <span
+                                class="
+                                    status
+                                    ${category.active
+                        ? "active"
+                        : "hidden-status"
+                    }
+                                "
+                            >
+                                ${category.active
+                        ? "ظاهر"
+                        : "مخفي"
+                    }
+                            </span>
 
+                        </td>
 
-                                    ${category.description
-                            ? `
-                                                <p>
-                                                    ${esc(
-                                category.description
-                            )}
-                                                </p>
-                                            `
-                            : ""
-                        }
+                        <td>
 
-
-                                    <small>
-                                        ${count}
-                                        ${count === 1
-                            ? " كتاب"
-                            : " كتب"
-                        }
-
-                                        •
-
-                                        الترتيب:
-                                        ${category.sort_order}
-
-                                        •
-
-                                        ${category.active
-                            ? "ظاهر"
-                            : "مخفي"
-                        }
-
-                                    </small>
-
-                                </div>
-
-                            </div>
-
-
-                            <div class="row-actions">
+                            <div class="actions">
 
                                 <button
+                                    class="btn btn-light btn-small"
                                     type="button"
                                     data-edit-book-category="${esc(
-                            category.id
-                        )}"
+                        category.id
+                    )}"
                                 >
                                     تعديل
                                 </button>
 
-
                                 <button
+                                    class="btn ${category.active
+                        ? "btn-danger"
+                        : "btn-green"
+                    } btn-small"
                                     type="button"
                                     data-toggle-book-category="${esc(
-                            category.id
-                        )}"
+                        category.id
+                    )}"
                                 >
                                     ${category.active
-                            ? "إخفاء"
-                            : "إظهار"
-                        }
+                        ? "إخفاء"
+                        : "إظهار"
+                    }
                                 </button>
 
                             </div>
 
-                        </article>
-                    `;
-                }
+                        </td>
+
+                    </tr>
+                `
             )
             .join("");
-
-
-    document
-        .querySelectorAll(
-            "[data-edit-book-category]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        openBookCategory(
-                            button.dataset
-                                .editBookCategory
-                        );
-
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            "[data-toggle-book-category]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        toggleBookCategory(
-                            button.dataset
-                                .toggleBookCategory
-                        );
-
-            }
-        );
 }
 
-
-/* =====================================================
-   OPEN BOOK CATEGORY
-===================================================== */
-
-function openBookCategory(id = null) {
-
+function openBookCategoryForm(
+    category = null
+) {
     editingBookCategoryId =
-        id;
+        category?.id || null;
 
-
-    const category =
-        bookCategories.find(
-            item =>
-                String(item.id) ===
-                String(id)
-        );
-
-
-    $("#bookCategoryModalTitle")
-        .textContent =
-        id
+    openModal(
+        category
             ? "تعديل قسم الكتب"
-            : "إضافة قسم كتب";
+            : "إضافة قسم كتب",
+        `
+            <form id="bookCategoryForm">
 
+                <div class="form-grid">
 
-    $("#bookCategoryId")
-        .value =
-        id || "";
+                    <div class="form-group">
 
+                        <label>
+                            اسم القسم
+                        </label>
+
+                        <input
+                            id="bookCategoryName"
+                            class="form-control"
+                            required
+                            value="${esc(
+            category?.name || ""
+        )}"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            Slug
+                        </label>
+
+                        <input
+                            id="bookCategorySlug"
+                            class="form-control"
+                            dir="ltr"
+                            value="${esc(
+            category?.slug || ""
+        )}"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            ترتيب الظهور
+                        </label>
+
+                        <input
+                            id="bookCategorySort"
+                            class="form-control"
+                            type="number"
+                            value="${esc(
+            category?.sort_order ?? 0
+        )}"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            الحالة
+                        </label>
+
+                        <select
+                            id="bookCategoryActive"
+                            class="form-control"
+                        >
+
+                            <option
+                                value="true"
+                                ${category?.active !== false
+            ? "selected"
+            : ""
+        }
+                            >
+                                ظاهر
+                            </option>
+
+                            <option
+                                value="false"
+                                ${category?.active === false
+            ? "selected"
+            : ""
+        }
+                            >
+                                مخفي
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                    <div class="form-group form-full">
+
+                        <label>
+                            الوصف
+                        </label>
+
+                        <textarea
+                            id="bookCategoryDescription"
+                            class="form-control"
+                        >${esc(
+            category?.description || ""
+        )}</textarea>
+
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+
+                    <button
+                        class="btn btn-gold"
+                        type="submit"
+                    >
+                        حفظ القسم
+                    </button>
+
+                    <button
+                        id="cancelModalButton"
+                        class="btn btn-light"
+                        type="button"
+                    >
+                        إلغاء
+                    </button>
+
+                </div>
+
+            </form>
+        `
+    );
 
     $("#bookCategoryName")
-        .value =
-        category?.name || "";
-
-
-    $("#bookCategoryDescription")
-        .value =
-        category?.description || "";
-
-
-    $("#bookCategoryOrder")
-        .value =
-        category?.sort_order ??
-        bookCategories.length;
-
-
-    $("#bookCategoryActive")
-        .checked =
-        category?.active ??
-        true;
-
-
-    msg(
-        "#bookCategoryMessage",
-        ""
-    );
-
-
-    $("#bookCategoryModal")
-        ?.classList
-        .remove("hidden");
-}
-
-
-/* =====================================================
-   SAVE BOOK CATEGORY
-===================================================== */
-
-async function saveBookCategory() {
-
-    const name =
-        $("#bookCategoryName")
-            ?.value
-            .trim() || "";
-
-
-    if (!name) {
-
-        return msg(
-            "#bookCategoryMessage",
-            "اكتب اسم قسم الكتب."
+        ?.addEventListener(
+            "input",
+            () => {
+                if (
+                    !editingBookCategoryId
+                ) {
+                    $("#bookCategorySlug")
+                        .value =
+                        slugify(
+                            $("#bookCategoryName")
+                                .value
+                        );
+                }
+            }
         );
 
-    }
+    $("#bookCategoryForm")
+        ?.addEventListener(
+            "submit",
+            saveBookCategory
+        );
 
+    $("#cancelModalButton")
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+}
 
-    let slug;
+async function saveBookCategory(
+    event
+) {
+    event.preventDefault();
 
+    const button =
+        event.submitter;
 
-    if (editingBookCategoryId) {
+    setLoading(
+        button,
+        true,
+        "حفظ القسم"
+    );
 
-        const oldCategory =
-            bookCategories.find(
-                category =>
-                    String(category.id) ===
-                    String(editingBookCategoryId)
+    try {
+        const payload = {
+            name:
+                $("#bookCategoryName")
+                    .value
+                    .trim(),
+
+            slug:
+                $("#bookCategorySlug")
+                    .value
+                    .trim(),
+
+            description:
+                $("#bookCategoryDescription")
+                    .value
+                    .trim() ||
+                null,
+
+            sort_order:
+                Number(
+                    $("#bookCategorySort")
+                        .value || 0
+                ),
+
+            active:
+                $("#bookCategoryActive")
+                    .value === "true"
+        };
+
+        if (!payload.name) {
+            throw new Error(
+                "اسم القسم مطلوب"
             );
+        }
 
+        let result;
 
-        slug =
-            oldCategory?.slug ||
-            `book-category-${editingBookCategoryId}`;
+        if (editingBookCategoryId) {
+            result =
+                await supabase
+                    .from(
+                        "book_categories"
+                    )
+                    .update(payload)
+                    .eq(
+                        "id",
+                        editingBookCategoryId
+                    );
+        } else {
+            result =
+                await supabase
+                    .from(
+                        "book_categories"
+                    )
+                    .insert(
+                        payload
+                    );
+        }
 
-    } else {
+        if (result.error) {
+            throw result.error;
+        }
 
-        const baseSlug =
-            name
-                .toLowerCase()
-                .replace(
-                    /[^\p{L}\p{N}]+/gu,
-                    "-"
-                )
-                .replace(
-                    /^-|-$/g,
-                    ""
-                );
-
-
-        slug =
-            `${baseSlug}-${crypto
-                .randomUUID()
-                .slice(0, 8)}`;
-    }
-
-
-    const payload = {
-
-        name,
-
-        slug,
-
-        description:
-            $("#bookCategoryDescription")
-                ?.value
-                .trim() || "",
-
-        sort_order:
-            Number(
-                $("#bookCategoryOrder")
-                    ?.value
-            ) || 0,
-
-        active:
-            $("#bookCategoryActive")
-                ?.checked ??
-            true,
-
-        updated_at:
-            now()
-
-    };
-
-
-    msg(
-        "#bookCategoryMessage",
-        "جاري الحفظ...",
-        false
-    );
-
-
-    const result =
-        editingBookCategoryId
-
-            ? await supabase
-                .from("book_categories")
-                .update(payload)
-                .eq(
-                    "id",
-                    editingBookCategoryId
-                )
-
-            : await supabase
-                .from("book_categories")
-                .insert(payload);
-
-
-    if (result.error) {
-
-        return msg(
-            "#bookCategoryMessage",
-            "تعذر حفظ قسم الكتب: " +
-            result.error.message
+        showToast(
+            "تم حفظ قسم الكتب",
+            "success"
         );
 
+        closeModal();
+
+        await loadBookCategories();
+
+    } catch (error) {
+        console.error(error);
+
+        showToast(
+            error.message ||
+            "تعذر حفظ القسم",
+            "error"
+        );
+    } finally {
+        setLoading(
+            button,
+            false,
+            "حفظ القسم"
+        );
     }
-
-
-    $("#bookCategoryModal")
-        ?.classList
-        .add("hidden");
-
-
-    editingBookCategoryId =
-        null;
-
-
-    await loadAll();
 }
 
-
-/* =====================================================
-   TOGGLE BOOK CATEGORY
-===================================================== */
-
-async function toggleBookCategory(id) {
-
+async function toggleBookCategory(
+    id
+) {
     const category =
         bookCategories.find(
-            item =>
-                String(item.id) ===
-                String(id)
+            (item) =>
+                item.id === id
         );
-
 
     if (!category) {
         return;
     }
 
-
     const {
         error
-    } =
-        await supabase
-            .from("book_categories")
-            .update({
-
-                active:
-                    !category.active,
-
-                updated_at:
-                    now()
-
-            })
-            .eq(
-                "id",
-                id
-            );
-
+    } = await supabase
+        .from("book_categories")
+        .update({
+            active:
+                !category.active
+        })
+        .eq(
+            "id",
+            id
+        );
 
     if (error) {
-
-        alert(
-            "تعذر تغيير حالة قسم الكتب:\n" +
-            error.message
+        showToast(
+            "تعذر تغيير الحالة",
+            "error"
         );
 
         return;
     }
 
+    showToast(
+        "تم تحديث الحالة",
+        "success"
+    );
 
-    await loadAll();
+    await loadBookCategories();
 }
 
+/* =========================================================
+   BOOKS
+========================================================= */
 
-/* =====================================================
-   RENDER BOOKS
-===================================================== */
+async function loadBooks() {
+    const {
+        data,
+        error
+    } = await supabase
+        .from("books")
+        .select("*")
+        .order(
+            "sort_order",
+            {
+                ascending: true
+            }
+        );
 
-function renderBooks() {
+    if (error) {
+        console.error(
+            "Books error:",
+            error
+        );
 
-    const container =
-        $("#adminBooks");
+        books = [];
 
+        showToast(
+            "تعذر تحميل الكتب",
+            "error"
+        );
 
-    if (!container) {
         return;
     }
 
+    books =
+        data || [];
 
-    if (!books.length) {
+    renderBooksTable();
+    updateDashboard();
+}
 
-        container.innerHTML = `
-            <div class="empty-state">
-                لا توجد كتب حتى الآن.
-                اضغط على "كتاب جديد" لإضافة أول كتاب.
-            </div>
+function getBookCategoryName(
+    id
+) {
+    return (
+        bookCategories.find(
+            (item) =>
+                item.id === id
+        )?.name ||
+        "غير محدد"
+    );
+}
+
+function getStoragePublicUrl(
+    bucket,
+    path
+) {
+    if (!path) {
+        return "";
+    }
+
+    if (
+        /^https?:\/\//i.test(
+            path
+        )
+    ) {
+        return path;
+    }
+
+    const {
+        data
+    } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(path);
+
+    return (
+        data?.publicUrl ||
+        ""
+    );
+}
+
+function renderBooksTable() {
+    const tbody =
+        $("#booksTableBody");
+
+    if (!tbody) {
+        return;
+    }
+
+    const search =
+        (
+            $("#bookAdminSearch")
+                ?.value || ""
+        )
+            .trim()
+            .toLowerCase();
+
+    let list =
+        [...books];
+
+    if (search) {
+        list =
+            list.filter(
+                (book) =>
+                    [
+                        book.title,
+                        book.author,
+                        book.description
+                    ]
+                        .filter(Boolean)
+                        .join(" ")
+                        .toLowerCase()
+                        .includes(search)
+            );
+    }
+
+    if (!list.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td
+                    colspan="7"
+                    class="empty-state"
+                >
+                    لا توجد كتب.
+                </td>
+            </tr>
         `;
 
         return;
     }
 
-
-    container.innerHTML =
-        books
+    tbody.innerHTML =
+        list
             .map(
-                book => {
-
-                    const category =
-                        bookCategories.find(
-                            item =>
-                                String(item.id) ===
-                                String(book.category_id)
+                (book) => {
+                    const coverUrl =
+                        getStoragePublicUrl(
+                            BOOK_BUCKET,
+                            book.cover_url
                         );
 
-
-                    const cover =
-                        book.cover_url
-                            ? `
-                                <img
-                                    src="${esc(book.cover_url)}"
-                                    alt="${esc(book.title)}"
-                                    loading="lazy"
-                                >
-                            `
-                            : `
-                                <div class="admin-placeholder">
-                                    بدون غلاف
-                                </div>
-                            `;
-
-
                     return `
-                        <article
-                            class="admin-book-card"
-                        >
+                        <tr>
 
-                            <div class="admin-book-cover">
-                                ${cover}
-                            </div>
+                            <td>
 
+                                ${coverUrl
+                            ? `
+                                            <img
+                                                class="table-image"
+                                                src="${esc(
+                                coverUrl
+                            )}"
+                                                alt=""
+                                            >
+                                        `
+                            : `
+                                            <div class="table-placeholder">
+                                                📖
+                                            </div>
+                                        `
+                        }
 
-                            <div class="admin-book-main">
+                            </td>
 
-                                <span class="eyebrow">
+                            <td>
+                                <strong>
                                     ${esc(
-                        category?.name ||
-                        "بدون قسم"
-                    )
+                            book.title
+                        )}
+                                </strong>
+                            </td>
+
+                            <td>
+                                ${esc(
+                            getBookCategoryName(
+                                book.category_id
+                            )
+                        )}
+                            </td>
+
+                            <td>
+                                ${esc(
+                            book.author ||
+                            "—"
+                        )}
+                            </td>
+
+                            <td>
+                                ${book.pages
+                            ? money(
+                                book.pages
+                            )
+                            : "—"
                         }
-                                </span>
+                            </td>
 
+                            <td>
 
-                                <h3>
-                                    ${esc(book.title)}
-                                </h3>
-
-
-                                ${book.author
-                            ? `
-                                            <p>
-                                                المؤلف:
-                                                ${esc(book.author)}
-                                            </p>
-                                        `
-                            : ""
-                        }
-
-
-                                ${Number(book.pages) > 0
-                            ? `
-                                            <small>
-                                                ${money(book.pages)}
-                                                صفحة
-                                            </small>
-                                        `
-                            : ""
-                        }
-
-
-                                <div class="admin-book-status">
-
-                                    <span
-                                        class="status ${book.active
-                            ? "on"
-                            : "off"
-                        }"
-                                    >
+                                <span
+                                    class="
+                                        status
                                         ${book.active
+                            ? "active"
+                            : "hidden-status"
+                        }
+                                    "
+                                >
+                                    ${book.active
                             ? "ظاهر"
                             : "مخفي"
                         }
-                                    </span>
+                                </span>
 
+                            </td>
 
-                                    <span>
-                                        ${book.pdf_url
-                            ? "PDF متاح"
-                            : "بدون PDF"
-                        }
-                                    </span>
+                            <td>
 
-                                </div>
-
-
-                                <div class="row-actions">
+                                <div class="actions">
 
                                     <button
+                                        class="btn btn-light btn-small"
                                         type="button"
-                                        data-edit-book="${esc(book.id)}"
+                                        data-edit-book="${esc(
+                            book.id
+                        )}"
                                     >
                                         تعديل
                                     </button>
 
-
                                     <button
+                                        class="btn ${book.active
+                            ? "btn-danger"
+                            : "btn-green"
+                        } btn-small"
                                         type="button"
-                                        data-toggle-book="${esc(book.id)}"
+                                        data-toggle-book="${esc(
+                            book.id
+                        )}"
                                     >
                                         ${book.active
                             ? "إخفاء"
@@ -2715,1049 +2444,1508 @@ function renderBooks() {
                         }
                                     </button>
 
-
-                                    <button
-                                        type="button"
-                                        data-delete-book="${esc(book.id)}"
-                                        class="danger-btn"
-                                    >
-                                        حذف
-                                    </button>
-
                                 </div>
 
-                            </div>
+                            </td>
 
-                        </article>
+                        </tr>
                     `;
                 }
             )
             .join("");
-
-
-    document
-        .querySelectorAll(
-            "[data-edit-book]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        openBook(
-                            button.dataset.editBook
-                        );
-
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            "[data-toggle-book]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        toggleBook(
-                            button.dataset.toggleBook
-                        );
-
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            "[data-delete-book]"
-        )
-        .forEach(
-            button => {
-
-                button.onclick =
-                    () =>
-                        deleteBook(
-                            button.dataset.deleteBook
-                        );
-
-            }
-        );
 }
 
-
-/* =====================================================
-   OPEN BOOK
-===================================================== */
-
-function openBook(id = null) {
-
-    editingBookId =
-        id;
-
-
-    selectedBookCover = null;
-
-    selectedBookPdf = null;
-
-
-    const book =
-        books.find(
-            item =>
-                String(item.id) ===
-                String(id)
-        );
-
-
-    $("#bookModalTitle")
-        .textContent =
-        id
-            ? "تعديل الكتاب"
-            : "إضافة كتاب";
-
-
-    $("#bookId")
-        .value =
-        id || "";
-
-
-    $("#bookTitle")
-        .value =
-        book?.title || "";
-
-
-    $("#bookCategory")
-        .value =
-        book?.category_id || "";
-
-
-    $("#bookAuthor")
-        .value =
-        book?.author || "";
-
-
-    $("#bookDescription")
-        .value =
-        book?.description || "";
-
-
-    $("#bookPages")
-        .value =
-        book?.pages ?? "";
-
-
-    $("#bookOrder")
-        .value =
-        book?.sort_order ??
-        books.length;
-
-
-    $("#bookActive")
-        .checked =
-        book?.active ??
-        true;
-
-
-    $("#bookCoverFile")
-        .value =
-        "";
-
-
-    $("#bookPdfFile")
-        .value =
-        "";
-
-
-    const coverPreview =
-        $("#bookCoverPreview");
-
-
-    if (coverPreview) {
-
-        if (book?.cover_url) {
-
-            coverPreview.innerHTML = `
-                <img
-                    src="${esc(book.cover_url)}"
-                    alt=""
-                >
-            `;
-
-        } else {
-
-            coverPreview.innerHTML = `
-                <div class="admin-placeholder">
-                    لا يوجد غلاف
-                </div>
-            `;
-
-        }
-
-    }
-
-
-    const pdfStatus =
-        $("#bookPdfStatus");
-
-
-    if (pdfStatus) {
-
-        pdfStatus.innerHTML =
-            book?.pdf_url
-                ? `
-                    <span class="status on">
-                        ملف PDF موجود
-                    </span>
-                `
-                : `
-                    <span class="status off">
-                        لا يوجد ملف PDF
-                    </span>
-                `;
-
-    }
-
-
-    msg(
-        "#bookMessage",
-        ""
-    );
-
-
-    $("#bookModal")
-        ?.classList
-        .remove("hidden");
-}
-
-
-/* =====================================================
-   BOOK COVER FILE
-===================================================== */
-
-$("#bookCoverFile")
-    ?.addEventListener(
-        "change",
-        event => {
-
-            selectedBookCover =
-                event.target.files[0] ||
-                null;
-
-
-            if (!selectedBookCover) {
-                return;
-            }
-
-
-            const allowedTypes = [
-                "image/jpeg",
-                "image/png",
-                "image/webp"
-            ];
-
-
-            if (
-                !allowedTypes.includes(
-                    selectedBookCover.type
-                )
-            ) {
-
-                selectedBookCover = null;
-
-                event.target.value = "";
-
-                return msg(
-                    "#bookMessage",
-                    "غلاف الكتاب يجب أن يكون JPG أو PNG أو WEBP."
-                );
-
-            }
-
-
-            if (
-                selectedBookCover.size >
-                5 * 1024 * 1024
-            ) {
-
-                selectedBookCover = null;
-
-                event.target.value = "";
-
-                return msg(
-                    "#bookMessage",
-                    "حجم غلاف الكتاب يجب ألا يتجاوز 5MB."
-                );
-
-            }
-
-
-            const url =
-                URL.createObjectURL(
-                    selectedBookCover
-                );
-
-
-            $("#bookCoverPreview")
-                .innerHTML = `
-                    <img
-                        src="${url}"
-                        alt="معاينة الغلاف"
-                    >
-                `;
-        }
-    );
-
-
-/* =====================================================
-   BOOK PDF FILE
-===================================================== */
-
-$("#bookPdfFile")
-    ?.addEventListener(
-        "change",
-        event => {
-
-            selectedBookPdf =
-                event.target.files[0] ||
-                null;
-
-
-            if (!selectedBookPdf) {
-                return;
-            }
-
-
-            if (
-                selectedBookPdf.type !==
-                "application/pdf"
-            ) {
-
-                selectedBookPdf = null;
-
-                event.target.value = "";
-
-                return msg(
-                    "#bookMessage",
-                    "الملف يجب أن يكون بصيغة PDF فقط."
-                );
-
-            }
-
-
-            $("#bookPdfStatus")
-                .innerHTML = `
-                    <span class="status on">
-                        تم اختيار:
-                        ${esc(selectedBookPdf.name)}
-                    </span>
-                `;
-        }
-    );
-
-
-/* =====================================================
-   UPLOAD BOOK FILE
-===================================================== */
-
-async function uploadBookFile(
-    file,
-    folder
+function bookFormHtml(
+    book = null
 ) {
+    const categoryOptions =
+        bookCategories
+            .map(
+                (category) => `
+                    <option
+                        value="${esc(
+                    category.id
+                )}"
+                        ${book?.category_id ===
+                        category.id
+                        ? "selected"
+                        : ""
+                    }
+                    >
+                        ${esc(
+                        category.name
+                    )}
+                    </option>
+                `
+            )
+            .join("");
 
-    if (!file) {
-        return null;
-    }
-
-
-    const extension =
-        file.name
-            .split(".")
-            .pop()
-            .toLowerCase();
-
-
-    const path =
-        `${folder}/${crypto.randomUUID()}.${extension}`;
-
-
-    const upload =
-        await supabase
-            .storage
-            .from("book-library")
-            .upload(
-                path,
-                file,
-                {
-                    upsert: false,
-                    contentType:
-                        file.type
-                }
-            );
-
-
-    if (upload.error) {
-
-        throw new Error(
-            upload.error.message
+    const coverUrl =
+        getStoragePublicUrl(
+            BOOK_BUCKET,
+            book?.cover_url
         );
 
-    }
+    return `
+        <form id="bookForm">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+
+                    <label>
+                        اسم الكتاب
+                    </label>
+
+                    <input
+                        id="bookTitle"
+                        class="form-control"
+                        required
+                        value="${esc(
+        book?.title || ""
+    )}"
+                    >
+
+                </div>
 
 
-    const publicUrl =
-        supabase
-            .storage
-            .from("book-library")
-            .getPublicUrl(path)
-            .data
-            .publicUrl;
+                <div class="form-group">
+
+                    <label>
+                        القسم
+                    </label>
+
+                    <select
+                        id="bookCategory"
+                        class="form-control"
+                        required
+                    >
+
+                        <option value="">
+                            اختر القسم
+                        </option>
+
+                        ${categoryOptions}
+
+                    </select>
+
+                </div>
 
 
-    return publicUrl;
+                <div class="form-group">
+
+                    <label>
+                        المؤلف
+                    </label>
+
+                    <input
+                        id="bookAuthor"
+                        class="form-control"
+                        value="${esc(
+        book?.author || ""
+    )}"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        عدد الصفحات
+                    </label>
+
+                    <input
+                        id="bookPages"
+                        class="form-control"
+                        type="number"
+                        min="1"
+                        value="${esc(
+        book?.pages || ""
+    )}"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        ترتيب الظهور
+                    </label>
+
+                    <input
+                        id="bookSort"
+                        class="form-control"
+                        type="number"
+                        value="${esc(
+        book?.sort_order ?? 0
+    )}"
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        الحالة
+                    </label>
+
+                    <select
+                        id="bookActive"
+                        class="form-control"
+                    >
+
+                        <option
+                            value="true"
+                            ${book?.active !== false
+            ? "selected"
+            : ""
+        }
+                        >
+                            ظاهر
+                        </option>
+
+                        <option
+                            value="false"
+                            ${book?.active === false
+            ? "selected"
+            : ""
+        }
+                        >
+                            مخفي
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="form-group form-full">
+
+                    <label>
+                        وصف الكتاب
+                    </label>
+
+                    <textarea
+                        id="bookDescription"
+                        class="form-control"
+                    >${esc(
+            book?.description || ""
+        )}</textarea>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        غلاف الكتاب
+                    </label>
+
+                    <div class="file-box">
+
+                        <strong>
+                            رفع صورة الغلاف
+                        </strong>
+
+                        <span>
+                            JPG / PNG / WEBP
+                        </span>
+
+                        <input
+                            id="bookCover"
+                            type="file"
+                            accept="image/*"
+                        >
+
+                        ${coverUrl
+            ? `
+                                    <img
+                                        id="bookCoverPreview"
+                                        class="preview-image"
+                                        src="${esc(
+                coverUrl
+            )}"
+                                        alt=""
+                                    >
+                                `
+            : `
+                                    <img
+                                        id="bookCoverPreview"
+                                        class="preview-image hidden"
+                                        alt=""
+                                    >
+                                `
+        }
+
+                    </div>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label>
+                        ملف PDF
+                    </label>
+
+                    <div class="file-box">
+
+                        <strong>
+                            رفع ملف الكتاب
+                        </strong>
+
+                        <span>
+                            PDF
+                        </span>
+
+                        <input
+                            id="bookPdf"
+                            type="file"
+                            accept="application/pdf,.pdf"
+                        >
+
+                        ${book?.pdf_url
+            ? `
+                                    <div
+                                        style="
+                                            color:#16835b;
+                                            font-size:11px;
+                                            margin-top:8px;
+                                        "
+                                    >
+                                        يوجد ملف PDF حاليًا
+                                    </div>
+                                `
+            : ""
+        }
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-actions">
+
+                <button
+                    class="btn btn-gold"
+                    type="submit"
+                >
+                    حفظ الكتاب
+                </button>
+
+                <button
+                    id="cancelModalButton"
+                    class="btn btn-light"
+                    type="button"
+                >
+                    إلغاء
+                </button>
+
+            </div>
+
+        </form>
+    `;
 }
 
+function openBookForm(
+    book = null
+) {
+    editingBookId =
+        book?.id || null;
 
-/* =====================================================
-   SAVE BOOK
-===================================================== */
+    openModal(
+        book
+            ? "تعديل الكتاب"
+            : "إضافة كتاب جديد",
+        bookFormHtml(book)
+    );
 
-async function saveBook() {
+    $("#bookCover")
+        ?.addEventListener(
+            "change",
+            (event) => {
+                const file =
+                    event.target.files?.[0];
 
-    const title =
-        $("#bookTitle")
-            ?.value
-            .trim() || "";
+                const preview =
+                    $("#bookCoverPreview");
 
+                if (
+                    !file ||
+                    !preview
+                ) {
+                    return;
+                }
 
-    const categoryId =
-        $("#bookCategory")
-            ?.value || "";
+                preview.src =
+                    URL.createObjectURL(
+                        file
+                    );
 
-
-    const author =
-        $("#bookAuthor")
-            ?.value
-            .trim() || "";
-
-
-    const description =
-        $("#bookDescription")
-            ?.value
-            .trim() || "";
-
-
-    const pagesText =
-        $("#bookPages")
-            ?.value
-            .trim() || "";
-
-
-    const pages =
-        pagesText === ""
-            ? null
-            : Number(pagesText);
-
-
-    const sortOrder =
-        Number(
-            $("#bookOrder")
-                ?.value
-        ) || 0;
-
-
-    const active =
-        $("#bookActive")
-            ?.checked ??
-        true;
-
-
-    if (!title) {
-
-        return msg(
-            "#bookMessage",
-            "اكتب اسم الكتاب."
+                preview.classList.remove(
+                    "hidden"
+                );
+            }
         );
 
-    }
-
-
-    if (!categoryId) {
-
-        return msg(
-            "#bookMessage",
-            "اختر قسم الكتاب."
+    $("#bookForm")
+        ?.addEventListener(
+            "submit",
+            saveBook
         );
 
-    }
-
-
-    if (
-        pages !== null &&
-        (
-            !Number.isInteger(pages) ||
-            pages < 0
-        )
-    ) {
-
-        return msg(
-            "#bookMessage",
-            "عدد الصفحات يجب أن يكون رقمًا صحيحًا."
+    $("#cancelModalButton")
+        ?.addEventListener(
+            "click",
+            closeModal
         );
+}
 
-    }
+async function saveBook(
+    event
+) {
+    event.preventDefault();
 
+    const button =
+        event.submitter;
 
-    const oldBook =
-        books.find(
-            item =>
-                String(item.id) ===
-                String(editingBookId)
-        );
-
-
-    let coverUrl =
-        oldBook?.cover_url ||
-        null;
-
-
-    let pdfUrl =
-        oldBook?.pdf_url ||
-        null;
-
+    setLoading(
+        button,
+        true,
+        "حفظ الكتاب"
+    );
 
     try {
-
-        /* ---------------------------------------------
-           COVER
-        --------------------------------------------- */
-
-        if (selectedBookCover) {
-
-            msg(
-                "#bookMessage",
-                "جاري رفع غلاف الكتاب...",
-                false
+        const currentBook =
+            books.find(
+                (item) =>
+                    item.id ===
+                    editingBookId
             );
 
+        const coverFile =
+            $("#bookCover")
+                ?.files?.[0];
 
-            coverUrl =
-                await uploadBookFile(
-                    selectedBookCover,
+        const pdfFile =
+            $("#bookPdf")
+                ?.files?.[0];
+
+        let coverPath =
+            currentBook?.cover_url ||
+            null;
+
+        let pdfPath =
+            currentBook?.pdf_url ||
+            null;
+
+        if (coverFile) {
+            const uploaded =
+                await uploadFile(
+                    BOOK_BUCKET,
+                    coverFile,
                     "covers"
                 );
+
+            coverPath =
+                uploaded?.path ||
+                coverPath;
         }
 
-
-        /* ---------------------------------------------
-           PDF
-        --------------------------------------------- */
-
-        if (selectedBookPdf) {
-
-            msg(
-                "#bookMessage",
-                "جاري رفع ملف PDF...",
-                false
-            );
-
-
-            pdfUrl =
-                await uploadBookFile(
-                    selectedBookPdf,
+        if (pdfFile) {
+            const uploaded =
+                await uploadFile(
+                    BOOK_BUCKET,
+                    pdfFile,
                     "pdfs"
                 );
+
+            pdfPath =
+                uploaded?.path ||
+                pdfPath;
         }
 
+        const payload = {
+            category_id:
+                $("#bookCategory")
+                    .value,
+
+            title:
+                $("#bookTitle")
+                    .value
+                    .trim(),
+
+            author:
+                $("#bookAuthor")
+                    .value
+                    .trim() ||
+                null,
+
+            description:
+                $("#bookDescription")
+                    .value
+                    .trim() ||
+                null,
+
+            cover_url:
+                coverPath,
+
+            pdf_url:
+                pdfPath,
+
+            pages:
+                $("#bookPages")
+                    .value
+                    ? Number(
+                        $("#bookPages")
+                            .value
+                    )
+                    : null,
+
+            sort_order:
+                Number(
+                    $("#bookSort")
+                        .value || 0
+                ),
+
+            active:
+                $("#bookActive")
+                    .value === "true"
+        };
+
+        if (
+            !payload.title
+        ) {
+            throw new Error(
+                "اسم الكتاب مطلوب"
+            );
+        }
+
+        if (
+            !payload.category_id
+        ) {
+            throw new Error(
+                "اختر قسم الكتاب"
+            );
+        }
+
+        if (
+            !payload.pdf_url
+        ) {
+            throw new Error(
+                "يجب رفع ملف PDF للكتاب"
+            );
+        }
+
+        let result;
+
+        if (editingBookId) {
+            result =
+                await supabase
+                    .from("books")
+                    .update(payload)
+                    .eq(
+                        "id",
+                        editingBookId
+                    );
+        } else {
+            result =
+                await supabase
+                    .from("books")
+                    .insert(
+                        payload
+                    );
+        }
+
+        if (result.error) {
+            throw result.error;
+        }
+
+        showToast(
+            "تم حفظ الكتاب بنجاح",
+            "success"
+        );
+
+        closeModal();
+
+        await loadBooks();
 
     } catch (error) {
+        console.error(error);
 
-        return msg(
-            "#bookMessage",
-            "تعذر رفع الملف: " +
-            error.message
+        showToast(
+            error.message ||
+            "تعذر حفظ الكتاب",
+            "error"
         );
-
-    }
-
-
-    if (!pdfUrl) {
-
-        return msg(
-            "#bookMessage",
-            "يجب رفع ملف PDF للكتاب."
+    } finally {
+        setLoading(
+            button,
+            false,
+            "حفظ الكتاب"
         );
-
     }
-
-
-    const payload = {
-
-        category_id:
-            categoryId,
-
-        title,
-
-        author,
-
-        description,
-
-        cover_url:
-            coverUrl,
-
-        pdf_url:
-            pdfUrl,
-
-        pages,
-
-        active,
-
-        sort_order:
-            sortOrder,
-
-        updated_at:
-            now()
-
-    };
-
-
-    msg(
-        "#bookMessage",
-        "جاري حفظ الكتاب...",
-        false
-    );
-
-
-    const result =
-        editingBookId
-
-            ? await supabase
-                .from("books")
-                .update(payload)
-                .eq(
-                    "id",
-                    editingBookId
-                )
-
-            : await supabase
-                .from("books")
-                .insert(payload);
-
-
-    if (result.error) {
-
-        return msg(
-            "#bookMessage",
-            "تعذر حفظ الكتاب: " +
-            result.error.message
-        );
-
-    }
-
-
-    $("#bookModal")
-        ?.classList
-        .add("hidden");
-
-
-    editingBookId = null;
-
-    selectedBookCover = null;
-
-    selectedBookPdf = null;
-
-
-    await loadAll();
 }
 
-
-/* =====================================================
-   TOGGLE BOOK
-===================================================== */
-
-async function toggleBook(id) {
-
+async function toggleBook(
+    id
+) {
     const book =
         books.find(
-            item =>
-                String(item.id) ===
-                String(id)
+            (item) =>
+                item.id === id
         );
-
 
     if (!book) {
         return;
     }
 
-
     const {
         error
-    } =
-        await supabase
-            .from("books")
-            .update({
-
-                active:
-                    !book.active,
-
-                updated_at:
-                    now()
-
-            })
-            .eq(
-                "id",
-                id
-            );
-
+    } = await supabase
+        .from("books")
+        .update({
+            active:
+                !book.active
+        })
+        .eq(
+            "id",
+            id
+        );
 
     if (error) {
-
-        alert(
-            "تعذر تغيير حالة الكتاب:\n" +
-            error.message
+        showToast(
+            "تعذر تغيير حالة الكتاب",
+            "error"
         );
 
         return;
     }
 
-
-    await loadAll();
-}
-
-
-/* =====================================================
-   DELETE BOOK
-===================================================== */
-
-async function deleteBook(id) {
-
-    const book =
-        books.find(
-            item =>
-                String(item.id) ===
-                String(id)
-        );
-
-
-    if (!book) {
-        return;
-    }
-
-
-    const confirmed =
-        confirm(
-            `هل أنت متأكد من حذف الكتاب؟\n\n${book.title}`
-        );
-
-
-    if (!confirmed) {
-        return;
-    }
-
-
-    const {
-        error
-    } =
-        await supabase
-            .from("books")
-            .delete()
-            .eq(
-                "id",
-                id
-            );
-
-
-    if (error) {
-
-        alert(
-            "تعذر حذف الكتاب:\n" +
-            error.message
-        );
-
-        return;
-    }
-
-
-    await loadAll();
-}
-
-
-/* =====================================================
-   LOGIN
-===================================================== */
-
-async function login() {
-
-    const email =
-        $("#adminEmail")
-            .value
-            .trim();
-
-
-    const password =
-        $("#adminPassword")
-            .value;
-
-
-    if (!email || !password) {
-
-        return msg(
-            "#adminLoginMessage",
-            "اكتب البريد الإلكتروني وكلمة المرور."
-        );
-
-    }
-
-
-    msg(
-        "#adminLoginMessage",
-        "جاري تسجيل الدخول...",
-        false
+    showToast(
+        "تم تحديث حالة الكتاب",
+        "success"
     );
 
+    await loadBooks();
+}
+
+/* =========================================================
+   NEWS
+========================================================= */
+
+async function loadNews() {
+    const {
+        data,
+        error
+    } = await supabase
+        .from("news_ticker")
+        .select("*")
+        .order(
+            "sort_order",
+            {
+                ascending: true
+            }
+        );
+
+    if (error) {
+        console.error(
+            "News error:",
+            error
+        );
+
+        newsItems = [];
+
+        showToast(
+            "تعذر تحميل الأخبار",
+            "error"
+        );
+
+        return;
+    }
+
+    newsItems =
+        data || [];
+
+    renderNewsTable();
+    updateDashboard();
+}
+
+function renderNewsTable() {
+    const tbody =
+        $("#newsTableBody");
+
+    if (!tbody) {
+        return;
+    }
+
+    if (!newsItems.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td
+                    colspan="4"
+                    class="empty-state"
+                >
+                    لا توجد رسائل.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    tbody.innerHTML =
+        newsItems
+            .map(
+                (item) => `
+                    <tr>
+
+                        <td>
+                            <strong>
+                                ${esc(
+                    item.text
+                )}
+                            </strong>
+                        </td>
+
+                        <td>
+                            ${esc(
+                    item.sort_order
+                )}
+                        </td>
+
+                        <td>
+
+                            <span
+                                class="
+                                    status
+                                    ${item.active
+                        ? "active"
+                        : "hidden-status"
+                    }
+                                "
+                            >
+                                ${item.active
+                        ? "ظاهر"
+                        : "مخفي"
+                    }
+                            </span>
+
+                        </td>
+
+                        <td>
+
+                            <div class="actions">
+
+                                <button
+                                    class="btn btn-light btn-small"
+                                    type="button"
+                                    data-edit-news="${esc(
+                        item.id
+                    )}"
+                                >
+                                    تعديل
+                                </button>
+
+                                <button
+                                    class="btn ${item.active
+                        ? "btn-danger"
+                        : "btn-green"
+                    } btn-small"
+                                    type="button"
+                                    data-toggle-news="${esc(
+                        item.id
+                    )}"
+                                >
+                                    ${item.active
+                        ? "إخفاء"
+                        : "إظهار"
+                    }
+                                </button>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+                `
+            )
+            .join("");
+}
+
+function openNewsForm(
+    item = null
+) {
+    editingNewsId =
+        item?.id || null;
+
+    openModal(
+        item
+            ? "تعديل الرسالة"
+            : "إضافة رسالة",
+        `
+            <form id="newsForm">
+
+                <div class="form-grid">
+
+                    <div class="form-group form-full">
+
+                        <label>
+                            نص الرسالة
+                        </label>
+
+                        <textarea
+                            id="newsText"
+                            class="form-control"
+                            required
+                            placeholder="اكتب الرسالة التي ستظهر في الشريط..."
+                        >${esc(
+            item?.text || ""
+        )}</textarea>
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            ترتيب الظهور
+                        </label>
+
+                        <input
+                            id="newsSort"
+                            class="form-control"
+                            type="number"
+                            value="${esc(
+            item?.sort_order ?? 0
+        )}"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            الحالة
+                        </label>
+
+                        <select
+                            id="newsActive"
+                            class="form-control"
+                        >
+
+                            <option
+                                value="true"
+                                ${item?.active !== false
+            ? "selected"
+            : ""
+        }
+                            >
+                                ظاهر
+                            </option>
+
+                            <option
+                                value="false"
+                                ${item?.active === false
+            ? "selected"
+            : ""
+        }
+                            >
+                                مخفي
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+
+                    <button
+                        class="btn btn-gold"
+                        type="submit"
+                    >
+                        حفظ الرسالة
+                    </button>
+
+                    <button
+                        id="cancelModalButton"
+                        class="btn btn-light"
+                        type="button"
+                    >
+                        إلغاء
+                    </button>
+
+                </div>
+
+            </form>
+        `
+    );
+
+    $("#newsForm")
+        ?.addEventListener(
+            "submit",
+            saveNews
+        );
+
+    $("#cancelModalButton")
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+}
+
+async function saveNews(
+    event
+) {
+    event.preventDefault();
+
+    const button =
+        event.submitter;
+
+    setLoading(
+        button,
+        true,
+        "حفظ الرسالة"
+    );
+
+    try {
+        const payload = {
+            text:
+                $("#newsText")
+                    .value
+                    .trim(),
+
+            sort_order:
+                Number(
+                    $("#newsSort")
+                        .value || 0
+                ),
+
+            active:
+                $("#newsActive")
+                    .value === "true"
+        };
+
+        if (!payload.text) {
+            throw new Error(
+                "نص الرسالة مطلوب"
+            );
+        }
+
+        let result;
+
+        if (editingNewsId) {
+            result =
+                await supabase
+                    .from("news_ticker")
+                    .update(payload)
+                    .eq(
+                        "id",
+                        editingNewsId
+                    );
+        } else {
+            result =
+                await supabase
+                    .from("news_ticker")
+                    .insert(
+                        payload
+                    );
+        }
+
+        if (result.error) {
+            throw result.error;
+        }
+
+        showToast(
+            "تم حفظ الرسالة",
+            "success"
+        );
+
+        closeModal();
+
+        await loadNews();
+
+    } catch (error) {
+        console.error(error);
+
+        showToast(
+            error.message ||
+            "تعذر حفظ الرسالة",
+            "error"
+        );
+    } finally {
+        setLoading(
+            button,
+            false,
+            "حفظ الرسالة"
+        );
+    }
+}
+
+async function toggleNews(
+    id
+) {
+    const item =
+        newsItems.find(
+            (news) =>
+                news.id === id
+        );
+
+    if (!item) {
+        return;
+    }
 
     const {
         error
-    } =
-        await supabase.auth
-            .signInWithPassword({
-                email,
-                password
-            });
-
-
-    if (error) {
-
-        return msg(
-            "#adminLoginMessage",
-            "البريد الإلكتروني أو كلمة المرور غير صحيحة."
+    } = await supabase
+        .from("news_ticker")
+        .update({
+            active:
+                !item.active
+        })
+        .eq(
+            "id",
+            id
         );
 
+    if (error) {
+        showToast(
+            "تعذر تغيير حالة الرسالة",
+            "error"
+        );
+
+        return;
     }
 
+    showToast(
+        "تم تحديث الرسالة",
+        "success"
+    );
 
-    await checkAdmin();
+    await loadNews();
 }
 
-
-/* =====================================================
+/* =========================================================
    EVENTS
-===================================================== */
+========================================================= */
 
+function setupEvents() {
 
-/* LOGIN */
+    /* Navigation */
 
-$("#adminLoginBtn")
-    ?.addEventListener(
-        "click",
-        login
-    );
-
-
-/* LOGOUT */
-
-$("#logoutBtn")
-    ?.addEventListener(
-        "click",
-        async () => {
-
-            await supabase.auth.signOut();
-
-            showLogin();
-
-        }
-    );
-
-
-/* PRODUCT CATEGORY */
-
-$("#addCategoryBtn")
-    ?.addEventListener(
-        "click",
-        () =>
-            openCategory()
-    );
-
-
-$("#saveCategoryBtn")
-    ?.addEventListener(
-        "click",
-        saveCategory
-    );
-
-
-/* PRODUCT */
-
-$("#addProductBtn")
-    ?.addEventListener(
-        "click",
-        () =>
-            openProduct()
-    );
-
-
-$("#saveProductBtn")
-    ?.addEventListener(
-        "click",
-        saveProduct
-    );
-
-
-/* NEWS */
-
-$("#addNewsBtn")
-    ?.addEventListener(
-        "click",
-        () =>
-            openNews()
-    );
-
-
-$("#saveNewsBtn")
-    ?.addEventListener(
-        "click",
-        saveNews
-    );
-
-
-/* PRODUCT SEARCH */
-
-$("#categorySearch")
-    ?.addEventListener(
-        "input",
-        renderCategories
-    );
-
-
-$("#productSearch")
-    ?.addEventListener(
-        "input",
-        renderProducts
-    );
-
-
-$("#productCategoryFilter")
-    ?.addEventListener(
-        "change",
-        renderProducts
-    );
-
-
-/* BOOK CATEGORY */
-
-$("#addBookCategoryBtn")
-    ?.addEventListener(
-        "click",
-        () =>
-            openBookCategory()
-    );
-
-
-$("#saveBookCategoryBtn")
-    ?.addEventListener(
-        "click",
-        saveBookCategory
-    );
-
-
-/* BOOK */
-
-$("#addBookBtn")
-    ?.addEventListener(
-        "click",
-        () =>
-            openBook()
-    );
-
-
-$("#saveBookBtn")
-    ?.addEventListener(
-        "click",
-        saveBook
-    );
-
-
-/* BOOK SEARCH */
-
-$("#bookSearch")
-    ?.addEventListener(
-        "input",
-        renderBooks
-    );
-
-
-$("#bookCategoryFilter")
-    ?.addEventListener(
-        "change",
-        renderBooks
-    );
-
-
-/* CLOSE MODALS */
-
-document
-    .querySelectorAll(
-        "[data-close]"
-    )
-    .forEach(
-        button => {
-
-            button.onclick =
+    document
+        .querySelectorAll(
+            ".sidebar-link"
+        )
+        .forEach((button) => {
+            button.addEventListener(
+                "click",
                 () => {
-
-                    $(
-                        "#" +
-                        button.dataset.close
-                    )
-                        ?.classList
-                        .add("hidden");
-
-                };
-
-        }
-    );
+                    switchSection(
+                        button.dataset.section
+                    );
+                }
+            );
+        });
 
 
-/* ENTER LOGIN */
+    /* Mobile sidebar */
 
-$("#adminPassword")
-    ?.addEventListener(
-        "keydown",
-        event => {
+    $("#mobileSidebarButton")
+        ?.addEventListener(
+            "click",
+            () => {
+                $("#sidebar")
+                    ?.classList.toggle(
+                        "open"
+                    );
+            }
+        );
+
+
+    /* Modal */
+
+    $("#modalClose")
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+
+    $("#modal")
+        ?.addEventListener(
+            "click",
+            (event) => {
+                if (
+                    event.target.id ===
+                    "modal"
+                ) {
+                    closeModal();
+                }
+            }
+        );
+
+
+    /* Logout */
+
+    $("#logoutButton")
+        ?.addEventListener(
+            "click",
+            async () => {
+                await supabase.auth.signOut();
+
+                currentUser = null;
+
+                showLogin();
+
+                showToast(
+                    "تم تسجيل الخروج",
+                    "success"
+                );
+            }
+        );
+
+
+    /* Add buttons */
+
+    $("#addProductButton")
+        ?.addEventListener(
+            "click",
+            () =>
+                openProductForm()
+        );
+
+    $("#addCategoryButton")
+        ?.addEventListener(
+            "click",
+            () =>
+                openCategoryForm()
+        );
+
+    $("#addBookButton")
+        ?.addEventListener(
+            "click",
+            () =>
+                openBookForm()
+        );
+
+    $("#addBookCategoryButton")
+        ?.addEventListener(
+            "click",
+            () =>
+                openBookCategoryForm()
+        );
+
+    $("#addNewsButton")
+        ?.addEventListener(
+            "click",
+            () =>
+                openNewsForm()
+        );
+
+
+    /* Search */
+
+    $("#productAdminSearch")
+        ?.addEventListener(
+            "input",
+            renderProductsTable
+        );
+
+    $("#bookAdminSearch")
+        ?.addEventListener(
+            "input",
+            renderBooksTable
+        );
+
+
+    /* Table actions */
+
+    document.addEventListener(
+        "click",
+        (event) => {
+
+            const target =
+                event.target;
+
+
+            const editProduct =
+                target.closest(
+                    "[data-edit-product]"
+                );
+
+            if (editProduct) {
+                const product =
+                    products.find(
+                        (item) =>
+                            item.id ===
+                            editProduct.dataset
+                                .editProduct
+                    );
+
+                if (product) {
+                    openProductForm(
+                        product
+                    );
+                }
+
+                return;
+            }
+
+
+            const toggleProductButton =
+                target.closest(
+                    "[data-toggle-product]"
+                );
+
+            if (toggleProductButton) {
+                toggleProduct(
+                    toggleProductButton
+                        .dataset
+                        .toggleProduct
+                );
+
+                return;
+            }
+
+
+            const editCategory =
+                target.closest(
+                    "[data-edit-category]"
+                );
+
+            if (editCategory) {
+                const category =
+                    categories.find(
+                        (item) =>
+                            item.id ===
+                            editCategory.dataset
+                                .editCategory
+                    );
+
+                if (category) {
+                    openCategoryForm(
+                        category
+                    );
+                }
+
+                return;
+            }
+
+
+            const toggleCategoryButton =
+                target.closest(
+                    "[data-toggle-category]"
+                );
 
             if (
-                event.key ===
-                "Enter"
+                toggleCategoryButton
             ) {
+                toggleCategory(
+                    toggleCategoryButton
+                        .dataset
+                        .toggleCategory
+                );
 
-                login();
+                return;
+            }
 
+
+            const editBook =
+                target.closest(
+                    "[data-edit-book]"
+                );
+
+            if (editBook) {
+                const book =
+                    books.find(
+                        (item) =>
+                            item.id ===
+                            editBook.dataset
+                                .editBook
+                    );
+
+                if (book) {
+                    openBookForm(
+                        book
+                    );
+                }
+
+                return;
+            }
+
+
+            const toggleBookButton =
+                target.closest(
+                    "[data-toggle-book]"
+                );
+
+            if (
+                toggleBookButton
+            ) {
+                toggleBook(
+                    toggleBookButton
+                        .dataset
+                        .toggleBook
+                );
+
+                return;
+            }
+
+
+            const editBookCategory =
+                target.closest(
+                    "[data-edit-book-category]"
+                );
+
+            if (
+                editBookCategory
+            ) {
+                const category =
+                    bookCategories.find(
+                        (item) =>
+                            item.id ===
+                            editBookCategory
+                                .dataset
+                                .editBookCategory
+                    );
+
+                if (category) {
+                    openBookCategoryForm(
+                        category
+                    );
+                }
+
+                return;
+            }
+
+
+            const toggleBookCategoryButton =
+                target.closest(
+                    "[data-toggle-book-category]"
+                );
+
+            if (
+                toggleBookCategoryButton
+            ) {
+                toggleBookCategory(
+                    toggleBookCategoryButton
+                        .dataset
+                        .toggleBookCategory
+                );
+
+                return;
+            }
+
+
+            const editNews =
+                target.closest(
+                    "[data-edit-news]"
+                );
+
+            if (editNews) {
+                const item =
+                    newsItems.find(
+                        (news) =>
+                            news.id ===
+                            editNews.dataset
+                                .editNews
+                    );
+
+                if (item) {
+                    openNewsForm(
+                        item
+                    );
+                }
+
+                return;
+            }
+
+
+            const toggleNewsButton =
+                target.closest(
+                    "[data-toggle-news]"
+                );
+
+            if (
+                toggleNewsButton
+            ) {
+                toggleNews(
+                    toggleNewsButton
+                        .dataset
+                        .toggleNews
+                );
             }
 
         }
     );
+}
 
+/* =========================================================
+   LOAD EVERYTHING
+========================================================= */
 
-/* =====================================================
-   AUTH
-===================================================== */
+async function loadEverything() {
+    await loadCategories();
 
-supabase.auth.onAuthStateChange(
-    () => {
+    await loadProducts();
 
-        setTimeout(
-            checkAdmin,
-            0
+    await loadBookCategories();
+
+    await loadBooks();
+
+    await loadNews();
+
+    updateDashboard();
+}
+
+/* =========================================================
+   LOGIN
+========================================================= */
+
+async function handleLogin(
+    event
+) {
+    event.preventDefault();
+
+    const email =
+        $("#loginEmail")
+            ?.value
+            .trim();
+
+    const password =
+        $("#loginPassword")
+            ?.value;
+
+    const button =
+        $("#loginButton");
+
+    const errorBox =
+        $("#loginError");
+
+    if (errorBox) {
+        errorBox.classList.add(
+            "hidden"
         );
 
+        errorBox.textContent =
+            "";
+    }
+
+    setLoading(
+        button,
+        true,
+        "تسجيل الدخول"
+    );
+
+    try {
+        const {
+            data,
+            error
+        } =
+            await supabase.auth
+                .signInWithPassword({
+                    email,
+                    password
+                });
+
+        if (error) {
+            throw error;
+        }
+
+        currentUser =
+            data?.user || null;
+
+        const isAdmin =
+            await checkAdmin();
+
+        if (!isAdmin) {
+            await supabase.auth.signOut();
+
+            throw new Error(
+                "هذا الحساب ليس لديه صلاحية مدير."
+            );
+        }
+
+        await showAdminApp();
+
+        await loadEverything();
+
+        switchSection(
+            "dashboard"
+        );
+
+    } catch (error) {
+        console.error(error);
+
+        if (errorBox) {
+            errorBox.textContent =
+                error.message ||
+                "تعذر تسجيل الدخول";
+
+            errorBox.classList.remove(
+                "hidden"
+            );
+        }
+
+    } finally {
+        setLoading(
+            button,
+            false,
+            "تسجيل الدخول"
+        );
+    }
+}
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    async () => {
+
+        $("#loginForm")
+            ?.addEventListener(
+                "submit",
+                handleLogin
+            );
+
+        setupEvents();
+
+        /*
+         * التحقق من الجلسة الحالية.
+         */
+        currentUser =
+            await getCurrentUser();
+
+        if (currentUser) {
+
+            const isAdmin =
+                await checkAdmin();
+
+            if (isAdmin) {
+
+                await showAdminApp();
+
+                await loadEverything();
+
+                switchSection(
+                    "dashboard"
+                );
+
+                return;
+            }
+
+            await supabase.auth
+                .signOut();
+        }
+
+        showLogin();
     }
 );
-
-
-/* =====================================================
-   START
-===================================================== */
-
-showLogin();
-
-checkAdmin();
